@@ -26,6 +26,10 @@ Drag & drop GUI (GTK 4 / libadwaita) + CLI, installable or portable on
 to the original as `<name>_cropped.pdf`; **the original is never modified**,
 and the content is not re-encoded: vectors stay vectors, text stays text.
 
+<p align="center">
+  <img src="data/screenshots/main-window.png" alt="PDF Cropper after a folder was dropped on it: three drawings cropped, each with its new page size, and one file reported as not being a PDF" width="680">
+</p>
+
 ## Download
 
 Grab a build from the
