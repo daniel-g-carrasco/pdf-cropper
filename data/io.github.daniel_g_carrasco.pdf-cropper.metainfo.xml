@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- AppStream metadata: shown by GNOME Software / Flathub. -->
+<component type="desktop-application">
+  <id>io.github.daniel_g_carrasco.pdf-cropper</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+
+  <name>PDF Cropper</name>
+  <summary>Crop the white margins of PDF pages</summary>
+  <summary xml:lang="it">Ritaglia i bordi bianchi dei PDF</summary>
+
+  <developer id="io.github.daniel_g_carrasco">
+    <name>Daniel Grasso</name>
+  </developer>
+
+  <description>
+    <p>
+      PDF Cropper removes the white margins around the content of PDF pages,
+      many files at once. It is made for drawings plotted on a sheet much
+      larger than the drawing itself: the cropped copy opens straight on the
+      content and prints without wasting paper.
+    </p>
+    <p xml:lang="it">
+      PDF Cropper toglie i bordi bianchi attorno al contenuto delle pagine
+      PDF, molti file in un colpo. È pensato per le tavole stampate su un
+      foglio molto più grande del disegno: la copia ritagliata si apre
+      direttamente sul contenuto e si stampa senza sprecare carta.
+    </p>
+    <ul>
+      <li>Drag and drop files or whole folders (scanned recursively)</li>
+      <li xml:lang="it">Trascina file o intere cartelle (scansione ricorsiva)</li>
+      <li>Batch cropping with live results</li>
+      <li xml:lang="it">Ritaglio in serie con risultati in tempo reale</li>
+      <li>Adjustable margin left around the content</li>
+      <li xml:lang="it">Margine regolabile lasciato attorno al contenuto</li>
+      <li>Vectors and text are kept as they are: only the page boxes change</li>
+      <li xml:lang="it">Vettori e testo restano tali: cambiano solo i riquadri di pagina</li>
+    </ul>
+    <p>
+      The cropped copy is saved next to the original, which is never modified.
+    </p>
+    <p xml:lang="it">
+      La copia ritagliata viene salvata accanto all'originale, che non viene
+      mai modificato.
+    </p>
+  </description>
+
+  <launchable type="desktop-id">io.github.daniel_g_carrasco.pdf-cropper.desktop</launchable>
+  <provides>
+    <binary>pdf-cropper</binary>
+    <mediatype>application/pdf</mediatype>
+  </provides>
+
+  <url type="homepage">https://github.com/daniel-g-carrasco/pdf-cropper</url>
+  <url type="bugtracker">https://github.com/daniel-g-carrasco/pdf-cropper/issues</url>
+  <url type="vcs-browser">https://github.com/daniel-g-carrasco/pdf-cropper</url>
+
+  <branding>
+    <color type="primary" scheme_preference="light">#8ff0a4</color>
+    <color type="primary" scheme_preference="dark">#26a269</color>
+  </branding>
+
+  <content_rating type="oars-1.1"/>
+
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+  </supports>
+  <requires>
+    <display_length compare="ge">640</display_length>
+  </requires>
+
+  <releases>
+    <release version="1.0.0" date="2026-10-02">
+      <description>
+        <p>First release: drag and drop cropping of files and folders, adjustable
+           margin, command line, Explorer context menu and update check on
+           Windows, Flatpak on Linux.</p>
+        <p xml:lang="it">Prima versione: ritaglio di file e cartelle con il
+           trascinamento, margine regolabile, riga di comando, menu contestuale
+           di Esplora file e controllo aggiornamenti su Windows, Flatpak su
+           Linux.</p>
+      </description>
+    </release>
+  </releases>
+</component>

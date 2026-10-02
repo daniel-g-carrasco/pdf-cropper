@@ -1,0 +1,261 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  # The PDF engine. Keep in step with the wheels pinned in the Flatpak
+  # manifest (build-aux/flatpak/).
+  PYPDFIUM2_VERSION: "5.13.0"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: pip install "pypdfium2==${PYPDFIUM2_VERSION}"
+      - run: python tests/test_crop.py
+      - name: Validate desktop entry and AppStream metadata
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y desktop-file-utils appstream
+          desktop-file-validate data/io.github.daniel_g_carrasco.pdf-cropper.desktop
+          appstreamcli validate --no-net data/io.github.daniel_g_carrasco.pdf-cropper.metainfo.xml
+      - name: Check that the Flatpak manifest pins the same pypdfium2
+        run: grep -q "pypdfium2-${PYPDFIUM2_VERSION}-" build-aux/flatpak/io.github.daniel_g_carrasco.pdf-cropper.yaml
+      - name: Check that the tag matches __version__
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          v="$(python -c 'import pdf_cropper as p; print(p.__version__)')"
+          if [ "v$v" != "${GITHUB_REF_NAME}" ]; then
+            echo "tag ${GITHUB_REF_NAME} does not match __version__ = $v"; exit 1
+          fi
+
+  windows:
+    needs: test
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            zip
+            mingw-w64-x86_64-gtk4
+            mingw-w64-x86_64-python
+            mingw-w64-x86_64-python-pip
+            mingw-w64-x86_64-python-gobject
+            mingw-w64-x86_64-pyinstaller
+            mingw-w64-x86_64-ca-certificates
+      - name: Fetch pypdfium2 (official wheel, unpacked for the MSYS2 Python)
+        run: |
+          # MSYS2's pip only accepts mingw wheels for its own environment, but
+          # pypdfium2 is pure Python around a self-contained pdfium.dll loaded
+          # with ctypes: the official win_amd64 wheel works as it is.
+          python -m pip install --target vendor --platform win_amd64 \
+            --only-binary=:all: --no-deps "pypdfium2==${PYPDFIUM2_VERSION}"
+          test -f vendor/pypdfium2_raw/pdfium.dll
+      - name: Test suite under the MSYS2 Python
+        run: PYTHONPATH=vendor python tests/test_crop.py
+      - name: Build with PyInstaller
+        run: |
+          python tools/compile_po.py
+          pyinstaller --noconfirm pdf-cropper.spec
+      - name: Verify GTK 4, PDFium, gdbus, CA bundle, icons and translations are in the bundle
+        run: |
+          I=dist/pdf-cropper/_internal
+          test -f "$I/gi_typelibs/Gtk-4.0.typelib"
+          ls "$I"/libgtk-4-*.dll
+          test -f "$I/pypdfium2_raw/pdfium.dll"   # the PDF engine
+          test -f "$I/gdbus.exe"          # single-instance support (GApplication)
+          test -f "$I/certs/ca-bundle.crt" # TLS for the update check
+          test -f "$I/share/icons/hicolor/scalable/apps/io.github.daniel_g_carrasco.pdf-cropper.svg"
+          test -f "$I/share/locale/it/LC_MESSAGES/pdf-cropper.mo"
+      - name: Ensure GLib schemas and icon themes are bundled
+        run: |
+          APPDIR=dist/pdf-cropper/_internal
+          if [ ! -f "$APPDIR/share/glib-2.0/schemas/gschemas.compiled" ]; then
+            mkdir -p "$APPDIR/share/glib-2.0/schemas"
+            cp /mingw64/share/glib-2.0/schemas/gschemas.compiled "$APPDIR/share/glib-2.0/schemas/"
+          fi
+          mkdir -p "$APPDIR/share/icons"
+          # -n: merge without overwriting the app icons already placed by the spec
+          cp -rn /mingw64/share/icons/Adwaita "$APPDIR/share/icons/" || true
+          cp -rn /mingw64/share/icons/hicolor "$APPDIR/share/icons/" || true
+      - name: Slim the bundle (locales and icon variants the app never loads)
+        run: |
+          I=dist/pdf-cropper/_internal
+          [ -d "$I/share/locale" ] && find "$I/share/locale" -mindepth 1 -maxdepth 1 ! -name it ! -name 'en*' -exec rm -rf {} + || true
+          rm -rf "$I/share/icons/AdwaitaLegacy" "$I/share/icons/Adwaita/cursors"
+          # fresh icon caches for the slimmed themes: without them GTK scans
+          # thousands of icon files at start-up
+          gtk4-update-icon-cache -q -t -f "$I/share/icons/Adwaita"
+          gtk4-update-icon-cache -q -t -f "$I/share/icons/hicolor"
+          du -sm "$I" | cut -f1 | xargs -I{} echo "bundle after slimming: {} MB"
+      - name: Smoke test (CLI through the bundled exe)
+        run: |
+          python tests/test_crop.py --make-sample sample.pdf
+          ./dist/pdf-cropper/pdf-cropper.exe sample.pdf
+          PYTHONPATH=vendor python tests/test_crop.py --check-sample sample_cropped.pdf
+      - name: Smoke test (GUI through the bundled exe)
+        run: |
+          # The window opens on the runner's desktop, crops the file handed on
+          # the command line and stays there until it is killed.
+          mkdir gui && python tests/test_crop.py --make-sample gui/drawing.pdf
+          ./dist/pdf-cropper/pdf-cropper.exe --gui gui/drawing.pdf >/dev/null 2>&1 &
+          for i in $(seq 1 60); do [ -f gui/drawing_cropped.pdf ] && break; sleep 1; done
+          sleep 2
+          # a second launch must hand its file to the window already open
+          python tests/test_crop.py --make-sample gui/second.pdf
+          ./dist/pdf-cropper/pdf-cropper.exe --gui gui/second.pdf >/dev/null 2>&1 &
+          for i in $(seq 1 30); do [ -f gui/second_cropped.pdf ] && break; sleep 1; done
+          sleep 2
+          running="$(tasklist //FI "IMAGENAME eq pdf-cropper.exe" //NH | grep -c pdf-cropper.exe || true)"
+          powershell -NoProfile -File tools/ci_screenshot.ps1 windows-gui.png || true
+          taskkill //F //IM pdf-cropper.exe >/dev/null 2>&1 || true
+          taskkill //F //IM gdbus.exe >/dev/null 2>&1 || true
+          PYTHONPATH=vendor python tests/test_crop.py --check-sample gui/drawing_cropped.pdf
+          PYTHONPATH=vendor python tests/test_crop.py --check-sample gui/second_cropped.pdf
+          echo "instances running after the second launch: $running"
+          test "$running" = "1"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: windows-gui-screenshot
+          path: windows-gui.png
+          if-no-files-found: ignore
+      - name: Smoke test (update check reaches GitHub over TLS)
+        run: ./dist/pdf-cropper/pdf-cropper.exe --check-update
+      - name: Package
+        run: |
+          VERSION="${GITHUB_REF_NAME}"
+          case "$VERSION" in v*) ;; *) VERSION=dev ;; esac
+          cd dist && zip -qr "../pdf-cropper-${VERSION}-windows-x64-portable.zip" pdf-cropper
+      - name: Build installer (Inno Setup)
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            choco install innosetup -y --no-progress
+          }
+          # Inno's AppVersion wants a bare number; the "v" is re-added to the
+          # output filename by the .iss so assets stay named v1.0.0.
+          $version = if ($env:GITHUB_REF_NAME -like 'v*') { $env:GITHUB_REF_NAME.Substring(1) } else { 'dev' }
+          & $iscc "/DAppVersion=$version" "installer\pdf-cropper.iss"
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows-x64
+          path: pdf-cropper-*-windows-x64-portable.zip
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows-installer
+          path: installer/Output/pdf-cropper-setup-*.exe
+
+  linux:
+    needs: test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install GTK 4, libadwaita and PyGObject
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-gi python3-gi-cairo gir1.2-gtk-4.0 \
+            gir1.2-adw-1 libadwaita-1-0 libgtk-4-1 libgtk-4-bin python3-venv \
+            binutils xvfb dbus imagemagick
+      - name: Build with PyInstaller
+        run: |
+          python3 tools/compile_po.py
+          python3 -m venv --system-site-packages .venv
+          .venv/bin/pip install pyinstaller "pypdfium2==${PYPDFIUM2_VERSION}"
+          .venv/bin/pyinstaller --noconfirm pdf-cropper.spec
+      - name: Verify GTK 4, libadwaita, PDFium and the translations are in the bundle
+        run: |
+          test -f dist/pdf-cropper/_internal/gi_typelibs/Gtk-4.0.typelib
+          test -f dist/pdf-cropper/_internal/gi_typelibs/Adw-1.typelib
+          ls dist/pdf-cropper/_internal/libgtk-4*.so*
+          ls dist/pdf-cropper/_internal/libadwaita-1*.so*
+          ls dist/pdf-cropper/_internal/pypdfium2_raw/libpdfium*.so*
+          test -f dist/pdf-cropper/_internal/share/locale/it/LC_MESSAGES/pdf-cropper.mo
+      - name: Slim the bundle (locales and icon variants the app never loads)
+        run: |
+          I=dist/pdf-cropper/_internal
+          [ -d "$I/share/locale" ] && find "$I/share/locale" -mindepth 1 -maxdepth 1 ! -name it ! -name 'en*' -exec rm -rf {} + || true
+          rm -rf "$I/share/icons/AdwaitaLegacy" "$I/share/icons/Adwaita/cursors"
+          [ -d "$I/share/icons/Adwaita" ] && gtk4-update-icon-cache -q -t -f "$I/share/icons/Adwaita" || true
+          du -sm "$I" | cut -f1 | xargs -I{} echo "bundle after slimming: {} MB"
+      - name: Smoke test (CLI through the bundled binary)
+        run: |
+          .venv/bin/python tests/test_crop.py --make-sample sample.pdf
+          ./dist/pdf-cropper/pdf-cropper sample.pdf
+          .venv/bin/python tests/test_crop.py --check-sample sample_cropped.pdf
+      - name: Smoke test (GUI under Xvfb, libadwaita and plain GTK)
+        run: bash tools/ci_gui_smoke.sh
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: linux-gui-screenshots
+          path: gui-*.png
+          if-no-files-found: ignore
+      - name: Package
+        run: |
+          VERSION="${GITHUB_REF_NAME}"
+          case "$VERSION" in v*) ;; *) VERSION=dev ;; esac
+          tar -C dist -czf "pdf-cropper-${VERSION}-linux-x64-portable.tar.gz" pdf-cropper
+      - uses: actions/upload-artifact@v7
+        with:
+          name: linux-x64
+          path: pdf-cropper-*-linux-x64-portable.tar.gz
+
+  flatpak:
+    needs: test
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-50
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v7
+      # action maintained in flatpak/…; the runtime images come from flathub-infra/actions-images
+      - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: pdf-cropper-${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'dev' }}-linux-x64.flatpak
+          manifest-path: build-aux/flatpak/io.github.daniel_g_carrasco.pdf-cropper.yaml
+          cache-key: flatpak-builder-${{ github.sha }}
+          upload-artifact: true
+      - name: Lint the manifest for Flathub (informational)
+        run: |
+          if command -v flatpak-builder-lint >/dev/null 2>&1; then
+            flatpak-builder-lint --exceptions manifest build-aux/flatpak/io.github.daniel_g_carrasco.pdf-cropper.yaml || true
+          else
+            echo "flatpak-builder-lint not available in this image"
+          fi
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [windows, linux, flatpak]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v3
+        with:
+          files: |
+            *.zip
+            *.tar.gz
+            *.exe
+            *.flatpak
+          generate_release_notes: true

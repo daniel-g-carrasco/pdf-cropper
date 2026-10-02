@@ -1,0 +1,72 @@
+# Flatpak manifest, used for local builds and by CI.
+#
+#   flatpak install flathub org.gnome.Platform//50 org.gnome.Sdk//50
+#   flatpak-builder --user --install --force-clean build-dir \
+#       build-aux/flatpak/io.github.daniel_g_carrasco.pdf-cropper.yaml
+#   flatpak run io.github.daniel_g_carrasco.pdf-cropper
+#
+# A Flathub submission would use this same file with the `dir` source replaced
+# by the tagged git release (type: git, url, tag, commit).
+app-id: io.github.daniel_g_carrasco.pdf-cropper
+branch: stable
+runtime: org.gnome.Platform
+runtime-version: '50'
+sdk: org.gnome.Sdk
+command: pdf-cropper
+
+finish-args:
+  - --share=ipc
+  - --socket=fallback-x11
+  - --socket=wayland
+  - --device=dri
+  # The cropped copy is written next to the PDF the user drops, picks or
+  # opens, and folders are scanned recursively. That needs real write access
+  # to those locations (home, removable media, network mounts), which the
+  # document portal (single file, read-only parent) cannot grant.
+  - --filesystem=host
+
+modules:
+  # The PDF engine: PDFium with its Python bindings, as the official wheel
+  # (pure Python around one self-contained shared library). Keep the version
+  # in step with PYPDFIUM2_VERSION in .github/workflows/build.yml.
+  - name: python3-pypdfium2
+    buildsystem: simple
+    build-commands:
+      - pip3 install --prefix=${FLATPAK_DEST} --no-deps --no-index --no-build-isolation pypdfium2-*.whl
+    sources:
+      - type: file
+        url: https://files.pythonhosted.org/packages/d3/7c/74a2fb48e5b0d2402d9ca64b39074c722d67e9a8a2c58449a843a8c2329a/pypdfium2-5.13.0-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+        sha256: 81df25c1ab4c13ff773102d3cbea1967511d079123b067fc077bd0c4d57d91d8
+        only-arches: [x86_64]
+      - type: file
+        url: https://files.pythonhosted.org/packages/fe/31/f8210d53775f142be934336665b1d60e800c3f176f28c29b4908d945c518/pypdfium2-5.13.0-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.whl
+        sha256: 9ee8c2bb2e68b396ab4a763215ac100dacb6b96d0da5bebeb239a021aecc3a7e
+        only-arches: [aarch64]
+
+  - name: pdf-cropper
+    buildsystem: simple
+    build-commands:
+      # pure Python, PyGObject and GTK 4 come with the GNOME runtime
+      - install -Dm755 pdf_cropper.py /app/bin/pdf-cropper
+      - python3 tools/compile_po.py --dest /app/share/locale
+      - install -Dm644 data/io.github.daniel_g_carrasco.pdf-cropper.desktop -t /app/share/applications
+      - install -Dm644 data/io.github.daniel_g_carrasco.pdf-cropper.metainfo.xml -t /app/share/metainfo
+      - install -Dm644 data/icons/hicolor/scalable/apps/io.github.daniel_g_carrasco.pdf-cropper.svg -t /app/share/icons/hicolor/scalable/apps
+      - install -Dm644 data/icons/hicolor/symbolic/apps/io.github.daniel_g_carrasco.pdf-cropper-symbolic.svg -t /app/share/icons/hicolor/symbolic/apps
+      - install -Dm644 data/icons/hicolor/64x64/apps/io.github.daniel_g_carrasco.pdf-cropper.png -t /app/share/icons/hicolor/64x64/apps
+      - install -Dm644 data/icons/hicolor/128x128/apps/io.github.daniel_g_carrasco.pdf-cropper.png -t /app/share/icons/hicolor/128x128/apps
+      - install -Dm644 data/icons/hicolor/256x256/apps/io.github.daniel_g_carrasco.pdf-cropper.png -t /app/share/icons/hicolor/256x256/apps
+      # fail the build early on invalid desktop entry / metainfo, or if the
+      # PDF engine cannot be loaded inside the sandbox
+      - desktop-file-validate /app/share/applications/io.github.daniel_g_carrasco.pdf-cropper.desktop
+      - appstreamcli validate --no-net /app/share/metainfo/io.github.daniel_g_carrasco.pdf-cropper.metainfo.xml
+      - python3 tests/test_crop.py
+    sources:
+      - type: dir
+        path: ../..
+        skip:
+          - .git
+          - .venv
+          - dist
+          - build
+          - vendor

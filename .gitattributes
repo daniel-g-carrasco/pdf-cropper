@@ -1,0 +1,2 @@
+# Shell scripts run in CI containers and under MSYS2: always LF.
+*.sh text eol=lf

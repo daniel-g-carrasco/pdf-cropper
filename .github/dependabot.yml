@@ -1,0 +1,14 @@
+# Keeps the GitHub Actions used by the CI workflow current: one pull request
+# per outdated action, checked weekly. The only Python dependency, pypdfium2,
+# is pinned by hand in the workflow and in the Flatpak manifest (wheel URLs
+# and checksums), and the toolchains come from MSYS2 / apt / the GNOME runtime
+# at build time.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- PDF Cropper symbolic icon. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+  <!-- Monochrome, on the 16 px grid: the outline of a document with a folded
+       corner, open at the bottom right where the crop glyph (two interlocked
+       corners) sits. Fills only, because GTK recolours symbolic icons through
+       the fill property. Keep the header short: gdk-pixbuf only looks for
+       <svg> in the first 256 bytes, and flatpak-builder rejects icons it
+       cannot load. -->
+  <path fill="#2e3436" d="M1 1H7L10 4V7H9V5H6V2H2V14H5V15H1Z"/>
+  <path fill="#2e3436" d="M8 7.5H9.5V12.5H16V14H8Z"/>
+  <path fill="#2e3436" d="M6 9.5H13.5V16H12V11H6Z"/>
+</svg>

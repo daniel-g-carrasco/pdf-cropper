@@ -1,0 +1,3 @@
+# The PDF engine (PDFium bindings). The GUI also needs PyGObject with GTK 4,
+# which comes from the system packages: see the README.
+pypdfium2>=5

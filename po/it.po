@@ -1,0 +1,361 @@
+# Italian translation of PDF Cropper.
+# Copyright (C) 2026 Daniel Grasso
+# This file is distributed under the same license as the pdf-cropper package.
+#
+# Update the template from the source with:
+#   xgettext --from-code=UTF-8 --keyword=_ -o po/pdf-cropper.pot pdf_cropper.py
+# and compile with:  python tools/compile_po.py
+msgid ""
+msgstr ""
+"Project-Id-Version: pdf-cropper 1.0.0\n"
+"Report-Msgid-Bugs-To: https://github.com/daniel-g-carrasco/pdf-cropper/issues\n"
+"POT-Creation-Date: 2026-10-02 12:00+0200\n"
+"PO-Revision-Date: 2026-10-02 12:00+0200\n"
+"Last-Translator: Daniel Grasso\n"
+"Language-Team: Italian\n"
+"Language: it\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+# --- cropping core --------------------------------------------------------
+
+msgid "the PDF engine is not available ({error}); install it with: pip install pypdfium2"
+msgstr "il motore PDF non è disponibile ({error}); installalo con: pip install pypdfium2"
+
+msgid "the PDF is password-protected"
+msgstr "il PDF è protetto da password"
+
+msgid "not a readable PDF document"
+msgstr "non è un documento PDF leggibile"
+
+msgid "{width} × {height} mm"
+msgstr "{width} × {height} mm"
+
+msgid "{cropped} of {pages} pages"
+msgstr "{cropped} pagine su {pages}"
+
+# --- update check -------------------------------------------------------
+
+msgid "GitHub answered {code}"
+msgstr "GitHub ha risposto {code}"
+
+msgid "unexpected answer from the server"
+msgstr "risposta inattesa dal server"
+
+msgid "cancelled"
+msgstr "annullato"
+
+msgid "download failed ({code})"
+msgstr "download fallito ({code})"
+
+msgid "Installed version: {version}"
+msgstr "Versione installata: {version}"
+
+msgid "Update check failed: {error}"
+msgstr "Controllo aggiornamenti non riuscito: {error}"
+
+msgid "Available: {version}  ({url})"
+msgstr "Disponibile: {version}  ({url})"
+
+msgid "Latest version: {version} (up to date)"
+msgstr "Ultima versione: {version} (aggiornato)"
+
+# --- Windows shell integration ------------------------------------------
+
+msgid "Crop white margins with PDF Cropper"
+msgstr "Ritaglia i bordi bianchi con PDF Cropper"
+
+# --- CLI ----------------------------------------------------------------
+
+msgid "No PDF files found."
+msgstr "Nessun file PDF trovato."
+
+msgid "SKIP  {file}  (already exists: {name}; use --overwrite)"
+msgstr "SALTO {file}  (esiste già: {name}; usa --overwrite)"
+
+msgid "SKIP  {file}  (no white margins to remove)"
+msgstr "SALTO {file}  (nessun bordo bianco da togliere)"
+
+msgid "Cropped: {ok}  Skipped: {skipped}  Errors: {errors}"
+msgstr "Ritagliati: {ok}  Saltati: {skipped}  Errori: {errors}"
+
+msgid "not a number: {value}"
+msgstr "non è un numero: {value}"
+
+msgid "must be between 0 and {max}"
+msgstr "deve essere compreso tra 0 e {max}"
+
+msgid "must be between 1 and 255"
+msgstr "deve essere compreso tra 1 e 255"
+
+msgid "Crop the white margins of PDF pages, many files at once."
+msgstr "Ritaglia i bordi bianchi delle pagine PDF, molti file in un colpo."
+
+msgid "Without arguments the graphical interface (GTK 4) starts. Examples: pdf-cropper drawing.pdf | pdf-cropper --margin 5 --overwrite folder/"
+msgstr "Senza argomenti si avvia l'interfaccia grafica (GTK 4). Esempi: pdf-cropper tavola.pdf | pdf-cropper --margin 5 --overwrite cartella/"
+
+msgid "FILE_OR_FOLDER"
+msgstr "FILE_O_CARTELLA"
+
+msgid "PDF files or folders to scan (recursive)"
+msgstr "file PDF o cartelle da scansionare (ricorsivo)"
+
+msgid "white border to leave around the content, in millimetres (default: {default})"
+msgstr "bordo bianco da lasciare attorno al contenuto, in millimetri (predefinito: {default})"
+
+msgid "grey level (1-255) below which a pixel counts as content; lower it for scans with a dirty background (default: {default})"
+msgstr "livello di grigio (1-255) sotto il quale un pixel conta come contenuto; abbassalo per le scansioni con lo sfondo sporco (predefinito: {default})"
+
+msgid "overwrite existing cropped files"
+msgstr "sovrascrivi i file ritagliati già esistenti"
+
+msgid "force the graphical interface"
+msgstr "forza l'avvio dell'interfaccia grafica"
+
+msgid "check whether a newer version exists and exit"
+msgstr "controlla se esiste una versione più recente ed esci"
+
+msgid "(Windows) add the entry to the File Explorer context menu for the current user and exit"
+msgstr "(Windows) aggiungi la voce al menu contestuale di Esplora file per l'utente corrente ed esci"
+
+msgid "(Windows) remove the context-menu entry and exit"
+msgstr "(Windows) rimuovi la voce dal menu contestuale ed esci"
+
+msgid "Option available on Windows only."
+msgstr "Opzione disponibile solo su Windows."
+
+msgid "Context-menu entry added for the current user."
+msgstr "Voce del menu contestuale aggiunta per l'utente corrente."
+
+msgid "Context-menu entry removed for the current user."
+msgstr "Voce del menu contestuale rimossa per l'utente corrente."
+
+msgid "GTK 4 / PyGObject not available. Install:"
+msgstr "GTK 4 / PyGObject non disponibili. Installa:"
+
+msgid "or download the portable build from the GitHub Releases."
+msgstr "oppure scarica la build portable dalle Release su GitHub."
+
+msgid "Headless use:  pdf-cropper FILE_OR_FOLDER..."
+msgstr "Uso senza GUI:  pdf-cropper FILE_O_CARTELLA..."
+
+# --- main window --------------------------------------------------------
+
+msgid "Queued"
+msgstr "In coda"
+
+msgid "Open folder"
+msgstr "Apri la cartella"
+
+msgid "Cropping…"
+msgstr "Ritaglio in corso…"
+
+msgid "Cropping… {percent}%"
+msgstr "Ritaglio in corso… {percent}%"
+
+msgid "Cropped ({detail}) → {name}"
+msgstr "Ritagliato ({detail}) → {name}"
+
+msgid "Skipped: the cropped file already exists (enable Overwrite)"
+msgstr "Saltato: il file ritagliato esiste già (attiva Sovrascrivi)"
+
+msgid "Skipped: no white margins to remove"
+msgstr "Saltato: nessun bordo bianco da togliere"
+
+msgid "Error: {error}"
+msgstr "Errore: {error}"
+
+msgid "Check for updates…"
+msgstr "Controlla aggiornamenti…"
+
+msgid "Preferences"
+msgstr "Preferenze"
+
+msgid "About {app}"
+msgstr "Informazioni su {app}"
+
+msgid "Main menu (F10)"
+msgstr "Menu principale (F10)"
+
+msgid "Close"
+msgstr "Chiudi"
+
+msgid "Choose files…"
+msgstr "Scegli file…"
+
+msgid "Choose folder…"
+msgstr "Scegli cartella…"
+
+msgid "Drop PDF files or folders here"
+msgstr "Trascina qui file PDF o cartelle"
+
+msgid "The cropped copy is saved next to the original"
+msgstr "La copia ritagliata viene salvata accanto all'originale"
+
+msgid "Cropped files will appear here"
+msgstr "I file ritagliati appariranno qui"
+
+msgid "Margin"
+msgstr "Margine"
+
+msgid "White border left around the content"
+msgstr "Bordo bianco lasciato attorno al contenuto"
+
+msgid "Overwrite existing files"
+msgstr "Sovrascrivi i file già esistenti"
+
+msgid "Crops the white margins of PDF pages, many files at once."
+msgstr "Ritaglia i bordi bianchi delle pagine PDF, molti file in un colpo."
+
+msgid "Project on GitHub"
+msgstr "Progetto su GitHub"
+
+msgid "PDF engine"
+msgstr "Motore PDF"
+
+msgid "Checking for updates…"
+msgstr "Controllo aggiornamenti in corso…"
+
+msgid "Version {version} of {app} is available."
+msgstr "È disponibile la versione {version} di {app}."
+
+msgid "Update…"
+msgstr "Aggiorna…"
+
+msgid "{app} {version} is up to date: no newer version."
+msgstr "{app} {version} è aggiornato: nessuna nuova versione."
+
+msgid "Cannot open {name}: {error}"
+msgstr "Impossibile aprire {name}: {error}"
+
+msgid "Choose PDF files"
+msgstr "Scegli file PDF"
+
+msgid "PDF documents (*.pdf)"
+msgstr "Documenti PDF (*.pdf)"
+
+msgid "All files"
+msgstr "Tutti i file"
+
+msgid "Open"
+msgstr "Apri"
+
+msgid "Cancel"
+msgstr "Annulla"
+
+msgid "Choose a folder"
+msgstr "Scegli una cartella"
+
+msgid "{ok} cropped · {skipped} skipped · {errors} errors"
+msgstr "{ok} ritagliati · {skipped} saltati · {errors} errori"
+
+# --- update dialog (Windows) --------------------------------------------
+
+msgid "Update available"
+msgstr "Aggiornamento disponibile"
+
+msgid "{app} {version} is available"
+msgstr "{app} {version} è disponibile"
+
+msgid "You are using version {version}."
+msgstr "Stai usando la versione {version}."
+
+msgid "Later"
+msgstr "Più tardi"
+
+msgid "Download and install"
+msgstr "Scarica e installa"
+
+msgid "The installation replaces the current version; the app will close."
+msgstr "L'installazione sostituisce la versione attuale; il programma verrà chiuso."
+
+msgid "Open the download page"
+msgstr "Apri la pagina di download"
+
+msgid "Downloading…"
+msgstr "Scaricamento in corso…"
+
+msgid "Download failed: {error}"
+msgstr "Download non riuscito: {error}"
+
+msgid "Starting the installer…"
+msgstr "Avvio dell'installazione…"
+
+msgid "Cannot start the installer: {error}"
+msgstr "Impossibile avviare l'installer: {error}"
+
+# --- preferences --------------------------------------------------------
+
+msgid "Automatic (follow the system)"
+msgstr "Automatico (segue il sistema)"
+
+msgid "Light"
+msgstr "Chiaro"
+
+msgid "Dark"
+msgstr "Scuro"
+
+msgid "Automatic (system language)"
+msgstr "Automatica (lingua di sistema)"
+
+msgid "Appearance"
+msgstr "Aspetto"
+
+msgid "Theme"
+msgstr "Tema"
+
+msgid "“Automatic” follows the system settings"
+msgstr "«Automatico» segue le impostazioni di sistema"
+
+msgid "Language"
+msgstr "Lingua"
+
+msgid "Takes effect at the next start"
+msgstr "Ha effetto al prossimo avvio"
+
+msgid "Native Windows decorations"
+msgstr "Decorazioni native di Windows"
+
+msgid "System title bar instead of GTK's (takes effect at the next start)"
+msgstr "Barra del titolo di sistema al posto di quella GTK (ha effetto al prossimo avvio)"
+
+msgid "General"
+msgstr "Generale"
+
+msgid "Check for updates at start-up"
+msgstr "Controlla aggiornamenti all'avvio"
+
+msgid "Once a day, from the project's GitHub Releases"
+msgstr "Una volta al giorno, dalle Release del progetto su GitHub"
+
+msgid "File Explorer"
+msgstr "Esplora file"
+
+msgid "Add"
+msgstr "Aggiungi"
+
+msgid "Remove"
+msgstr "Rimuovi"
+
+msgid "“Crop white margins” in the context menu of PDF files"
+msgstr "«Ritaglia i bordi bianchi» nel menu contestuale dei file PDF"
+
+msgid "The new language will be used at the next start."
+msgstr "La nuova lingua sarà attiva al prossimo avvio."
+
+msgid "Currently: present (on Windows 11 under “Show more options”)"
+msgstr "Attualmente: presente (su Windows 11 sotto «Mostra altre opzioni»)"
+
+msgid "Currently: not present"
+msgstr "Attualmente: non presente"
+
+msgid "Context-menu entry added."
+msgstr "Voce del menu contestuale aggiunta."
+
+msgid "Registration failed: {error}"
+msgstr "Registrazione non riuscita: {error}"
+
+msgid "Removal failed: {error}"
+msgstr "Rimozione non riuscita: {error}"

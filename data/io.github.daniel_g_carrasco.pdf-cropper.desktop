@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=PDF Cropper
+Comment=Crop the white margins of PDF pages, many files at once
+Comment[it]=Ritaglia i bordi bianchi delle pagine PDF, molti file in un colpo
+Exec=pdf-cropper --gui %F
+Icon=io.github.daniel_g_carrasco.pdf-cropper
+Terminal=false
+Categories=Utility;Office;GTK;
+Keywords=PDF;crop;trim;margins;borders;drawing;plot;
+Keywords[it]=PDF;ritaglia;rifila;margini;bordi;tavola;disegno;
+MimeType=application/pdf;
+StartupNotify=true
