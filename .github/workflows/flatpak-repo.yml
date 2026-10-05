@@ -38,6 +38,10 @@ jobs:
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
           url="https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           if git clone --depth 1 --branch gh-pages "$url" pages 2>/dev/null; then
+            # git does not store empty directories, and ostree refuses to
+            # list refs without the ones it created: put them back
+            mkdir -p pages/repo/refs/remotes pages/repo/refs/mirrors \
+              pages/repo/extensions pages/repo/state pages/repo/tmp/cache
             echo "existing repository fetched"
           else
             git init -b gh-pages pages
