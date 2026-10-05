@@ -194,6 +194,10 @@ metainfo and the icons from [data/](data/). CI builds a `.flatpak` bundle
 for every push and attaches it to releases. The app needs `--filesystem=host`
 because the cropped file is written next to the original, wherever that is.
 
+The [site/](site/) folder is the project page, https://pdf-cropper.neistar.com,
+deployed with Cloudflare Pages (repository connected, no build command,
+output directory `site`).
+
 ## Development
 
 ```bash
