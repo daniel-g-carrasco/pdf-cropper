@@ -39,7 +39,7 @@ Grab a build from the
 |---|---|---|
 | Windows installer | `pdf-cropper-setup-*-windows-x64.exe` | Start menu entry, uninstaller, Explorer context menu (optional), built-in update check |
 | Windows portable | `pdf-cropper-*-windows-x64-portable.zip` | unzip anywhere, run `pdf-cropper.exe` — no installation, no admin rights; the Explorer entry can be added from *Preferenze* |
-| Linux Flatpak | `pdf-cropper-*-linux-x64.flatpak` | `flatpak install pdf-cropper-*.flatpak` (the GNOME runtime comes from Flathub) |
+| Linux Flatpak | [our repository](https://daniel-g-carrasco.github.io/pdf-cropper/) | `flatpak install https://daniel-g-carrasco.github.io/pdf-cropper/pdf-cropper.flatpakref`, updates arrive through GNOME Software; a `.flatpak` bundle is attached to every release too |
 | Linux portable | `pdf-cropper-*-linux-x64-portable.tar.gz` | untar, run `./pdf-cropper` |
 
 Everything (GTK and the PDF engine included) ships inside the packages. The
@@ -169,7 +169,17 @@ Good to know:
 
 ## Flatpak
 
-To build and install locally:
+The app is published in its own Flatpak repository, served from GitHub Pages
+and signed with the key `7A84 D96C F374 FCB3 9BF1 B6E1 B706 A25D 82E5 3D33`;
+the GNOME runtime comes from Flathub. Install once, updates follow:
+
+```bash
+flatpak install https://daniel-g-carrasco.github.io/pdf-cropper/pdf-cropper.flatpakref
+```
+
+Every `v*` tag is published there by CI
+([flatpak-repo.yml](.github/workflows/flatpak-repo.yml)). To build locally
+instead:
 
 ```bash
 flatpak install flathub org.gnome.Platform//50 org.gnome.Sdk//50
