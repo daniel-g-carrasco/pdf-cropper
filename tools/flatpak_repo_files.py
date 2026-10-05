@@ -14,7 +14,7 @@ from pathlib import Path
 
 APP_ID = "io.github.daniel_g_carrasco.pdf-cropper"
 TITLE = "PDF Cropper"
-HOMEPAGE = "https://github.com/daniel-g-carrasco/pdf-cropper"
+HOMEPAGE = "https://pdf-cropper.neistar.com"
 COMMENT = "Crop the white margins of PDF pages, many files at once"
 DESCRIPTION = (
     "PDF Cropper removes the white margins around the content of PDF pages, "
@@ -72,8 +72,8 @@ GPGKey={key}
 <pre>flatpak install {base}/pdf-cropper.flatpakref</pre>
 <p>Gli aggiornamenti arrivano da soli, con GNOME Software o con <code>flatpak update</code>.
 Il repository è firmato: l'impronta della chiave è pubblicata nel
-<a href="{HOMEPAGE}#flatpak">README del progetto</a>.</p>
-<p><a href="{HOMEPAGE}">Sorgente e segnalazioni</a></p>
+<a href="https://github.com/daniel-g-carrasco/pdf-cropper#flatpak">README del progetto</a>.</p>
+<p><a href="{HOMEPAGE}">Sito dell'app</a> · <a href="https://github.com/daniel-g-carrasco/pdf-cropper">Sorgente e segnalazioni</a></p>
 </body>
 </html>
 """, encoding="utf-8")
