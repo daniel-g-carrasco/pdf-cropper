@@ -1820,8 +1820,9 @@ def run_gui(argv, settings: Settings) -> int:
             return False
 
         def _open_page(self, _btn):
-            # the launcher wants a GtkWindow: an AdwDialog is not one
-            open_uri(self._rel["url"], self._parent if use_adw else self)
+            # the launcher wants a GtkWindow: an AdwDialog is not one, its
+            # root is (the window it sits in, or its own floating one)
+            open_uri(self._rel["url"], self.get_root())
             self.close()
 
         def _download(self, _btn):
