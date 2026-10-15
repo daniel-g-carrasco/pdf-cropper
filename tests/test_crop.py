@@ -305,7 +305,7 @@ def main() -> int:
         again = pc.Settings(ini)
         assert not again.get_bool("check_updates")
         assert pc.clamp_margin(again.get("margin_mm")) == 7.5
-        assert again.get_bool("native_decorations")  # untouched default survives
+        assert again.get_bool("system_title_bar")  # untouched default survives
 
     # --- command line -----------------------------------------------------------
     # as re-parsed by the primary GUI instance

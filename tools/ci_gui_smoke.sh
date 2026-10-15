@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # CI helper: drive the bundled GUI under Xvfb, once as a libadwaita app and
-# once on the plain GTK path (the one the Windows build uses), and check that
+# once on the plain GTK path (the one without libadwaita), and check that
 # the folder handed on the command line really gets cropped. A screenshot of
 # each run is left in gui-<name>.png.
 #

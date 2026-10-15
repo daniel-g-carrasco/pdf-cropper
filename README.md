@@ -62,8 +62,8 @@ python3 pdf_cropper.py
 ```
 
 On Windows, use a release build. The command line needs nothing but
-`pip install pypdfium2`; the GUI needs GTK 4 from MSYS2
-(`pacman -S mingw-w64-x86_64-gtk4 mingw-w64-x86_64-python-gobject`).
+`pip install pypdfium2`; the GUI needs GTK 4 and libadwaita from MSYS2 UCRT64
+(`pacman -S mingw-w64-ucrt-x86_64-gtk4 mingw-w64-ucrt-x86_64-libadwaita mingw-w64-ucrt-x86_64-python-gobject`).
 
 ## CLI
 
@@ -126,10 +126,11 @@ Exit code is non-zero if any file failed. Existing outputs are skipped unless
   new installer and launch it; the portable build is sent to the release page.
 - Everything above is per-user (`HKEY_CURRENT_USER`) for the portable build;
   *Preferenze* → *Rimuovi* takes it away, as does the uninstaller.
-- **Native window decorations** by default: the system title bar (dark when
-  the theme is dark) handles moving, snapping and restoring from maximized,
-  which GTK's own decorations get wrong on Windows. *Preferenze* switches
-  back to GTK's header bar.
+- **libadwaita inside, Windows outside**: the content is the same libadwaita
+  interface as on Linux (drop zone, card list, toasts, dialogs), while the
+  system title bar (dark when the theme is dark) handles moving, snapping and
+  restoring from maximized, which GTK's own decorations get wrong on Windows.
+  *Preferenze* switches to libadwaita's header bar, at the cost of snapping.
 
 ### Linux
 
@@ -227,8 +228,7 @@ per language). To refresh the template after changing strings:
 then merge with `msgmerge -U po/it.po po/pdf-cropper.pot`. The test suite
 fails when a string of the source is missing from the catalogue.
 Set `PDF_CROPPER_STARTUP_LOG=<file>` to get start-up timestamps appended to a
-file (profiling aid), `PDF_CROPPER_NO_ADW=1` to force the plain GTK interface
-on Linux.
+file (profiling aid), `PDF_CROPPER_NO_ADW=1` to force the plain GTK interface.
 
 ## License
 

@@ -44,7 +44,7 @@ else:
     print('WARNING: locale/ missing: run tools/compile_po.py first (UI will be English only)')
 
 if WIN:
-    prefix = Path(sys.prefix)  # MSYS2: C:/msys64/mingw64
+    prefix = Path(sys.prefix)  # MSYS2: C:/msys64/ucrt64 (the one with libadwaita)
 
     # gdbus.exe lets GLib autolaunch a session bus on Windows, which
     # GApplication needs for its single-instance behaviour (a second launch
@@ -74,11 +74,9 @@ if WIN:
     else:
         print('WARNING: no CA bundle found: the update check may fail on TLS')
 
-# Introspection modules the gi hook must collect. The Linux GUI is a
-# libadwaita app; the Windows build stays on plain GTK (see pdf_cropper.py).
-GI_VERSIONS = {'Gtk': '4.0', 'Gdk': '4.0'}
-if not WIN:
-    GI_VERSIONS['Adw'] = '1'
+# Introspection modules the gi hook must collect: a libadwaita app on both
+# systems (on Windows inside a window with the system title bar).
+GI_VERSIONS = {'Gtk': '4.0', 'Gdk': '4.0', 'Adw': '1'}
 
 a = Analysis(
     ['pdf_cropper.py'],

@@ -48,16 +48,17 @@ jobs:
       - uses: actions/checkout@v7
       - uses: msys2/setup-msys2@v2
         with:
-          msystem: MINGW64
+          msystem: UCRT64
           update: true
           install: >-
             zip
-            mingw-w64-x86_64-gtk4
-            mingw-w64-x86_64-python
-            mingw-w64-x86_64-python-pip
-            mingw-w64-x86_64-python-gobject
-            mingw-w64-x86_64-pyinstaller
-            mingw-w64-x86_64-ca-certificates
+            mingw-w64-ucrt-x86_64-gtk4
+            mingw-w64-ucrt-x86_64-libadwaita
+            mingw-w64-ucrt-x86_64-python
+            mingw-w64-ucrt-x86_64-python-pip
+            mingw-w64-ucrt-x86_64-python-gobject
+            mingw-w64-ucrt-x86_64-pyinstaller
+            mingw-w64-ucrt-x86_64-ca-certificates
       - name: Fetch pypdfium2 (official wheel, unpacked for the MSYS2 Python)
         run: |
           # MSYS2's pip only accepts mingw wheels for its own environment, but
@@ -72,10 +73,12 @@ jobs:
         run: |
           python tools/compile_po.py
           pyinstaller --noconfirm pdf-cropper.spec
-      - name: Verify GTK 4, PDFium, gdbus, CA bundle, icons and translations are in the bundle
+      - name: Verify GTK 4, libadwaita, PDFium, gdbus, CA bundle, icons and translations are in the bundle
         run: |
           I=dist/pdf-cropper/_internal
           test -f "$I/gi_typelibs/Gtk-4.0.typelib"
+          test -f "$I/gi_typelibs/Adw-1.typelib"
+          ls "$I"/libadwaita-1-*.dll
           ls "$I"/libgtk-4-*.dll
           test -f "$I/pypdfium2_raw/pdfium.dll"   # the PDF engine
           test -f "$I/gdbus.exe"          # single-instance support (GApplication)
@@ -87,12 +90,12 @@ jobs:
           APPDIR=dist/pdf-cropper/_internal
           if [ ! -f "$APPDIR/share/glib-2.0/schemas/gschemas.compiled" ]; then
             mkdir -p "$APPDIR/share/glib-2.0/schemas"
-            cp /mingw64/share/glib-2.0/schemas/gschemas.compiled "$APPDIR/share/glib-2.0/schemas/"
+            cp /ucrt64/share/glib-2.0/schemas/gschemas.compiled "$APPDIR/share/glib-2.0/schemas/"
           fi
           mkdir -p "$APPDIR/share/icons"
           # -n: merge without overwriting the app icons already placed by the spec
-          cp -rn /mingw64/share/icons/Adwaita "$APPDIR/share/icons/" || true
-          cp -rn /mingw64/share/icons/hicolor "$APPDIR/share/icons/" || true
+          cp -rn /ucrt64/share/icons/Adwaita "$APPDIR/share/icons/" || true
+          cp -rn /ucrt64/share/icons/hicolor "$APPDIR/share/icons/" || true
       - name: Slim the bundle (locales and icon variants the app never loads)
         run: |
           I=dist/pdf-cropper/_internal

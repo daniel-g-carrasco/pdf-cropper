@@ -388,7 +388,8 @@ class Settings:
     DEFAULTS = {
         "language": "auto",            # auto (desktop language) | it | en
         "color_scheme": "auto",        # auto (follow the system) | light | dark
-        "native_decorations": "true",  # Windows: system title bar instead of GTK's
+        # Windows: the system title bar (and so Snap) rather than GTK's
+        "system_title_bar": "true",
         "margin_mm": str(DEFAULT_MARGIN_MM),  # white border left around the content
         "check_updates": "true",       # Windows: look for a new release daily
         "last_update_check": "",       # ISO date of the last automatic check
@@ -824,7 +825,7 @@ def build_parser() -> argparse.ArgumentParser:
 # GTK 4 GUI
 # ---------------------------------------------------------------------------
 
-# Plain GTK 4 (Windows, or Linux without libadwaita): GTK's own named colours.
+# Plain GTK 4 (no libadwaita): GTK's own named colours.
 _CSS = b"""
 .dropzone {
     border: 2px dashed alpha(currentColor, 0.25);
@@ -868,9 +869,9 @@ _CSS_ADW = b"""
 
 def run_gui(argv, settings: Settings) -> int:
     is_win = sys.platform == "win32"
-    # Native Windows decorations (system title bar): GTK honours GTK_CSD only
+    # The Windows title bar (system decorations): GTK honours GTK_CSD only
     # before it initialises, hence the environment variable set up front.
-    use_csd = not (is_win and settings.get_bool("native_decorations"))
+    use_csd = not (is_win and settings.get_bool("system_title_bar"))
     if not use_csd:
         os.environ["GTK_CSD"] = "0"
     if is_win:
@@ -891,8 +892,8 @@ def run_gui(argv, settings: Settings) -> int:
             "gir1.2-adw-1\n"
             "  Fedora:         sudo dnf install python3-gobject gtk4 libadwaita\n"
             "  Arch:           sudo pacman -S python-gobject gtk4 libadwaita\n"
-            "  Windows(MSYS2): pacman -S mingw-w64-x86_64-gtk4 "
-            "mingw-w64-x86_64-python-gobject\n"
+            "  Windows(MSYS2 UCRT64): pacman -S mingw-w64-ucrt-x86_64-gtk4 "
+            "mingw-w64-ucrt-x86_64-libadwaita mingw-w64-ucrt-x86_64-python-gobject\n"
             + _("or download the portable build from the GitHub Releases.") + "\n"
             + _("Headless use:  pdf-cropper FILE_OR_FOLDER..."),
             file=sys.stderr,
@@ -901,11 +902,13 @@ def run_gui(argv, settings: Settings) -> int:
 
     # libadwaita is the GNOME platform library: it supplies the current HIG
     # widgets and follows the system light/dark preference by itself (GTK
-    # deprecated gtk-application-prefer-dark-theme in 4.20). Linux only: the
-    # Windows build stays on plain GTK, which its native decorations need.
+    # deprecated gtk-application-prefer-dark-theme in 4.20). Also on Windows,
+    # for the content only when the window keeps the system title bar (an
+    # AdwApplicationWindow always draws its own, and Snap needs Windows'
+    # own: GTK's imitation of it does not work).
     # PDF_CROPPER_NO_ADW=1 forces the plain GTK path (testing aid).
     Adw = None
-    if not is_win and not os.environ.get("PDF_CROPPER_NO_ADW"):
+    if not os.environ.get("PDF_CROPPER_NO_ADW"):
         try:
             gi.require_version("Adw", "1")
             from gi.repository import Adw
@@ -1013,14 +1016,16 @@ def run_gui(argv, settings: Settings) -> int:
 
     class ThemeManager:
         """Light/dark colour scheme: explicit, or automatic following the
-        system. With libadwaita that is AdwStyleManager's job; on plain GTK 4
-        (Windows, or Linux without libadwaita) the preference is read by hand
-        from the personalization key / the freedesktop settings portal."""
+        system. With libadwaita that is AdwStyleManager's job, the Windows
+        title bar following it; on plain GTK 4 (no libadwaita) the preference
+        is read by hand from the personalization key / the freedesktop
+        settings portal."""
 
         def __init__(self):
             self.dark = False
             self._portal = None
             self._poll_id = 0
+            self._watching = False
             self.apply()
 
         def apply(self):
@@ -1034,6 +1039,12 @@ def run_gui(argv, settings: Settings) -> int:
                     "light": Adw.ColorScheme.FORCE_LIGHT,
                 }.get(mode, Adw.ColorScheme.DEFAULT))
                 self.dark = manager.get_dark()
+                if is_win and not self._watching:
+                    # the system title bar follows libadwaita's shade
+                    self._watching = True
+                    manager.connect("notify::dark", self._on_adw_dark)
+                if is_win:
+                    win_dark_titlebars(self.dark)
                 return
             if mode == "dark":
                 dark = True
@@ -1048,6 +1059,10 @@ def run_gui(argv, settings: Settings) -> int:
                 elif mode != "auto" and self._poll_id:
                     GLib.source_remove(self._poll_id)
                     self._poll_id = 0
+
+        def _on_adw_dark(self, manager, _pspec):
+            self.dark = manager.get_dark()
+            win_dark_titlebars(self.dark)
 
         def _poll(self):
             dark = self._system_prefers_dark()
@@ -1185,7 +1200,9 @@ def run_gui(argv, settings: Settings) -> int:
 
     # --- main window ------------------------------------------------------
 
-    WindowBase = Adw.ApplicationWindow if use_adw else Gtk.ApplicationWindow
+    # The system title bar needs a plain GTK window: libadwaita's always
+    # draws its own. Its content is libadwaita's all the same.
+    WindowBase = Adw.ApplicationWindow if use_adw and use_csd else Gtk.ApplicationWindow
 
     class Window(WindowBase):
         def __init__(self, app):
@@ -1203,17 +1220,20 @@ def run_gui(argv, settings: Settings) -> int:
             self._seq = itertools.count()
             self._native = None       # keep FileChooserNative alive
             self._banner_cb = None
+            self._toast = None        # the last one (libadwaita)
             self._about = None
             self.connect("map", lambda _w: _mark("window-mapped"))
 
             header = Adw.HeaderBar() if use_adw else Gtk.HeaderBar()
-            if use_adw:
-                pass  # placed by the AdwToolbarView below
-            elif use_csd:
-                self.set_titlebar(header)
-            else:  # native title bar: the header bar becomes a plain toolbar
-                header.set_show_title_buttons(False)
+            if not use_csd:  # native title bar: the header bar becomes a plain toolbar
+                if use_adw:
+                    header.set_show_start_title_buttons(False)
+                    header.set_show_end_title_buttons(False)
+                else:
+                    header.set_show_title_buttons(False)
                 header.set_title_widget(Gtk.Box())
+            elif not use_adw:
+                self.set_titlebar(header)    # libadwaita's: placed by the AdwToolbarView below
 
             menu = Gio.Menu()
             if is_win:
@@ -1256,7 +1276,10 @@ def run_gui(argv, settings: Settings) -> int:
                 view = Adw.ToolbarView()
                 view.add_top_bar(header)
                 view.set_content(self.toasts)
-                self.set_content(view)
+                if use_csd:
+                    self.set_content(view)
+                else:
+                    self.set_child(view)
             else:
                 set_margins(content, 16)
                 root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
@@ -1411,7 +1434,7 @@ def run_gui(argv, settings: Settings) -> int:
             if use_adw:
                 # A toast: transient on its own, persistent when it carries an
                 # action. AdwToast has no signal, hence the app action.
-                toast = Adw.Toast(title=text, use_markup=False)
+                toast = self._toast = Adw.Toast(title=text, use_markup=False)
                 if button_label:
                     toast.set_button_label(button_label)
                     toast.set_action_name("app.banner-action")
@@ -1426,6 +1449,13 @@ def run_gui(argv, settings: Settings) -> int:
         def run_banner_action(self):
             if self._banner_cb:
                 self._banner_cb()
+
+        def hide_banner(self):
+            if use_adw:
+                if self._toast is not None:
+                    self._toast.dismiss()
+            else:
+                self.banner.set_reveal_child(False)
 
         def _on_banner_button(self, _btn):
             self.banner.set_reveal_child(False)
@@ -1486,13 +1516,13 @@ def run_gui(argv, settings: Settings) -> int:
                 return False
             if is_newer(rel["version"]):
                 if manual:
-                    self.banner.set_reveal_child(False)
-                    UpdateDialog(self, rel).present()
+                    self.hide_banner()
+                    UpdateDialog(self, rel).open()
                 else:
                     self.show_banner(
                         _("Version {version} of {app} is available.").format(
                             version=rel["version"], app=APP_NAME),
-                        _("Update…"), lambda: UpdateDialog(self, rel).present())
+                        _("Update…"), lambda: UpdateDialog(self, rel).open())
             elif manual:
                 self.show_banner(_("{app} {version} is up to date: no newer version.").format(
                     app=APP_NAME, version=__version__))
@@ -1713,15 +1743,20 @@ def run_gui(argv, settings: Settings) -> int:
 
     # --- update dialog (Windows) --------------------------------------------
 
-    class UpdateDialog(Gtk.Window):
+    class UpdateDialog(Adw.Dialog if use_adw else Gtk.Window):
         def __init__(self, parent, rel):
-            super().__init__(transient_for=parent, modal=True, resizable=False,
-                             title=_("Update available"), default_width=480)
-            init_dialog(self)
+            if use_adw:
+                super().__init__(title=_("Update available"), content_width=480)
+                self.connect("closed", self._on_close)
+            else:
+                super().__init__(transient_for=parent, modal=True, resizable=False,
+                                 title=_("Update available"), default_width=480)
+                init_dialog(self)
+                self.connect("close-request", self._on_close)
+            self._parent = parent
             self._app = parent.get_application()
             self._rel = rel
             self._cancel = threading.Event()
-            self.connect("close-request", self._on_close)
 
             box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
             set_margins(box, 24)
@@ -1762,15 +1797,31 @@ def run_gui(argv, settings: Settings) -> int:
                 self.action.connect("clicked", self._open_page)
             self.action.add_css_class("suggested-action")
             box.append(button_row(later, self.action))
-            self.set_child(box)
+            if use_adw:
+                box.set_margin_top(6)       # right under the header bar
+                view = Adw.ToolbarView(content=box)
+                view.add_top_bar(Adw.HeaderBar())
+                self.set_child(view)
+            else:
+                self.set_child(box)
             self.set_default_widget(self.action)
+            # the notes are selectable: the dialog would open with them
+            # focused and all their text selected
+            self.set_focus(self.action)
+
+        def open(self):
+            if use_adw:
+                self.present(self._parent)
+            else:
+                self.present()
 
         def _on_close(self, _win):
             self._cancel.set()
             return False
 
         def _open_page(self, _btn):
-            open_uri(self._rel["url"], self)
+            # the launcher wants a GtkWindow: an AdwDialog is not one
+            open_uri(self._rel["url"], self._parent if use_adw else self)
             self.close()
 
         def _download(self, _btn):
@@ -1820,6 +1871,34 @@ def run_gui(argv, settings: Settings) -> int:
 
     # --- preferences --------------------------------------------------------
 
+    # The switch to the system title bar, in either kind of preferences
+    TITLE_BAR_HINT = _("Needed to snap the window to the screen edges "
+                       "(takes effect at the next start)")
+
+    # File Explorer actions (Windows): what each one tells the user
+    def shell_text():
+        try:
+            registered = win_is_registered()
+        except OSError:
+            registered = False
+        if registered:
+            return _("Currently: present (on Windows 11 under “Show more options”)")
+        return _("Currently: not present")
+
+    def register():
+        try:
+            win_register()
+            return _("Context-menu entry added.")
+        except OSError as e:
+            return _("Registration failed: {error}").format(error=e)
+
+    def unregister():
+        try:
+            win_unregister()
+            return _("Context-menu entry removed for the current user.")
+        except OSError as e:
+            return _("Removal failed: {error}").format(error=e)
+
     class PreferencesWindow(Gtk.Window):
         def __init__(self, parent):
             super().__init__(transient_for=parent, modal=True, resizable=False,
@@ -1844,9 +1923,7 @@ def run_gui(argv, settings: Settings) -> int:
                 self._dropdown(self._languages, "language", self._on_language)))
             if is_win:
                 look.append(self._row(
-                    _("Native Windows decorations"),
-                    _("System title bar instead of GTK's (takes effect at the next start)"),
-                    self._switch("native_decorations")))
+                    _("Windows title bar"), TITLE_BAR_HINT, self._switch("system_title_bar")))
             box.append(Gtk.Frame(child=look))
 
             if is_win:
@@ -1869,7 +1946,7 @@ def run_gui(argv, settings: Settings) -> int:
                 reg.append(b_unreg)
                 row, self.shell_label = self._row(
                     _("“Crop white margins” in the context menu of PDF files"),
-                    self._shell_text(), reg, return_subtitle=True)
+                    shell_text(), reg, return_subtitle=True)
                 shell.append(row)
                 box.append(Gtk.Frame(child=shell))
             self.set_child(box)
@@ -1924,38 +2001,22 @@ def run_gui(argv, settings: Settings) -> int:
             row.set_child(hbox)
             return (row, st) if return_subtitle else row
 
-        @staticmethod
-        def _shell_text():
-            try:
-                registered = win_is_registered()
-            except OSError:
-                registered = False
-            if registered:
-                return _("Currently: present (on Windows 11 under “Show more options”)")
-            return _("Currently: not present")
-
         def _refresh(self, message=None):
-            self.shell_label.set_label(self._shell_text())
+            self.shell_label.set_label(shell_text())
             if message:
                 self._parent.show_banner(message)
 
         def _on_register(self, _btn):
-            try:
-                win_register()
-                self._refresh(_("Context-menu entry added."))
-            except OSError as e:
-                self._refresh(_("Registration failed: {error}").format(error=e))
+            self._refresh(register())
 
         def _on_unregister(self, _btn):
-            try:
-                win_unregister()
-                self._refresh(_("Context-menu entry removed for the current user."))
-            except OSError as e:
-                self._refresh(_("Removal failed: {error}").format(error=e))
+            self._refresh(unregister())
 
     def adw_preferences(parent):
         """Preferences as an AdwPreferencesDialog: HIG boxed list, combo rows.
-        The plain-GTK PreferencesWindow above serves Windows."""
+        The plain-GTK PreferencesWindow above serves the windows without
+        libadwaita."""
+        dialog = Adw.PreferencesDialog(title=_("Preferences"))
         schemes = (("auto", _("Automatic (follow the system)")),
                    ("light", _("Light")), ("dark", _("Dark")))
         languages = (("auto", _("Automatic (system language)")),
@@ -1965,14 +2026,17 @@ def run_gui(argv, settings: Settings) -> int:
             settings.set("color_scheme", value)
             theme.apply()
 
+        def tell(message):      # over the dialog, where the user is looking
+            dialog.add_toast(Adw.Toast(title=message, use_markup=False))
+
         def on_language(value):
             settings.set("language", value)
-            parent.show_banner(_("The new language will be used at the next start."))
+            tell(_("The new language will be used at the next start."))
 
         def combo(title, subtitle, options, key, callback):
             keys = [k for k, _label in options]
             row = Adw.ComboRow(
-                title=title, subtitle=subtitle,
+                title=title, subtitle=subtitle, use_markup=False,
                 model=Gtk.StringList.new([label for _k, label in options]))
             current = settings.get(key)
             row.set_selected(keys.index(current) if current in keys else 0)
@@ -1980,14 +2044,50 @@ def run_gui(argv, settings: Settings) -> int:
                         lambda r, _p: callback(keys[r.get_selected()]))
             return row
 
+        def switch(title, subtitle, key):
+            row = Adw.SwitchRow(title=title, subtitle=subtitle, use_markup=False,
+                                active=settings.get_bool(key))
+            row.connect("notify::active", lambda r, _p: settings.set(key, r.get_active()))
+            return row
+
+        def action_row(title, subtitle, *buttons):
+            row = Adw.ActionRow(title=title, subtitle=subtitle, use_markup=False)
+            for label, callback in buttons:
+                button = Gtk.Button(label=label, valign=Gtk.Align.CENTER)
+                button.connect("clicked", lambda _b, c=callback: c(row))
+                row.add_suffix(button)
+            return row
+
+        page = Adw.PreferencesPage()
         group = Adw.PreferencesGroup(title=_("Appearance"))
         group.add(combo(_("Theme"), _("“Automatic” follows the system settings"),
                         schemes, "color_scheme", on_scheme))
         group.add(combo(_("Language"), _("Takes effect at the next start"),
                         languages, "language", on_language))
-        page = Adw.PreferencesPage()
+        if is_win:
+            group.add(switch(_("Windows title bar"), TITLE_BAR_HINT, "system_title_bar"))
         page.add(group)
-        dialog = Adw.PreferencesDialog(title=_("Preferences"))
+
+        if is_win:
+            group = Adw.PreferencesGroup(title=_("General"))
+            group.add(switch(_("Check for updates at start-up"),
+                             _("Once a day, from the project's GitHub Releases"),
+                             "check_updates"))
+            page.add(group)
+
+            def then_refresh(action):
+                def run(row):
+                    tell(action())
+                    row.set_subtitle(shell_text())
+                return run
+
+            group = Adw.PreferencesGroup(title=_("File Explorer"))
+            group.add(action_row(
+                _("“Crop white margins” in the context menu of PDF files"), shell_text(),
+                (_("Add"), then_refresh(register)),
+                (_("Remove"), then_refresh(unregister))))
+            page.add(group)
+
         dialog.add(page)
         dialog.present(parent)
 

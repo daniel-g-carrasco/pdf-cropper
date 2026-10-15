@@ -315,11 +315,11 @@ msgstr "Lingua"
 msgid "Takes effect at the next start"
 msgstr "Ha effetto al prossimo avvio"
 
-msgid "Native Windows decorations"
-msgstr "Decorazioni native di Windows"
+msgid "Windows title bar"
+msgstr "Barra del titolo di Windows"
 
-msgid "System title bar instead of GTK's (takes effect at the next start)"
-msgstr "Barra del titolo di sistema al posto di quella GTK (ha effetto al prossimo avvio)"
+msgid "Needed to snap the window to the screen edges (takes effect at the next start)"
+msgstr "Serve ad agganciare la finestra ai bordi dello schermo (ha effetto al prossimo avvio)"
 
 msgid "General"
 msgstr "Generale"
