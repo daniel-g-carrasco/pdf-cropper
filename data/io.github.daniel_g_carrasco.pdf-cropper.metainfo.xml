@@ -71,6 +71,19 @@
   </requires>
 
   <releases>
+    <release version="1.1.2" date="2026-10-16">
+      <description>
+        <p>Windows: on a monitor whose scale differs from the main one (a 250%
+           monitor next to a 200% one), Windows scales the whole window, at the
+           size of the other apps. Updates install without the setup wizard: the
+           app closes, Setup shows its progress and opens the app again.</p>
+        <p xml:lang="it">Windows: su un monitor con una scala diversa da quella del principale (un
+           monitor al 250% accanto a uno al 200%) Windows ingrandisce tutta la
+           finestra, alla dimensione delle altre app. Gli aggiornamenti si
+           installano senza la procedura guidata: il programma si chiude,
+           l'installazione mostra l'avanzamento e lo riapre.</p>
+      </description>
+    </release>
     <release version="1.1.1" date="2026-10-16">
       <description>
         <p>Windows: on a monitor whose scale is not a whole number (125%, 150%,
