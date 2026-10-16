@@ -78,6 +78,7 @@ jobs:
           I=dist/pdf-cropper/_internal
           test -f "$I/gi_typelibs/Gtk-4.0.typelib"
           test -f "$I/gi_typelibs/Adw-1.typelib"
+          test -f "$I/gi_typelibs/GdkWin32-4.0.typelib"   # the text follows 250% monitors
           ls "$I"/libadwaita-1-*.dll
           ls "$I"/libgtk-4-*.dll
           test -f "$I/pypdfium2_raw/pdfium.dll"   # the PDF engine
