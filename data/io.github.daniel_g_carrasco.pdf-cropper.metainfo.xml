@@ -71,6 +71,17 @@
   </requires>
 
   <releases>
+    <release version="1.1.1" date="2026-10-16">
+      <description>
+        <p>Windows: on a monitor whose scale is not a whole number (125%, 150%,
+           250%), the text is now as large as in the other apps: GTK draws at a
+           whole scale, and the text makes up for the rest, following the monitor
+           the window is on.</p>
+        <p xml:lang="it">Windows: su un monitor con una scala non intera (125%, 150%, 250%) il
+           testo ora è grande come nelle altre app: GTK disegna a una scala intera
+           e il testo recupera il resto, seguendo il monitor su cui sta la finestra.</p>
+      </description>
+    </release>
     <release version="1.1.0" date="2026-10-16">
       <description>
         <p>Windows: the same libadwaita interface as on Linux, inside the system
