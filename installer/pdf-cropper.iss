@@ -89,8 +89,15 @@ Filename: "{app}\pdf-cropper.exe"; Parameters: "--unregister"; RunOnceId: "Unreg
 
 [Run]
 Filename: "{app}\pdf-cropper.exe"; Description: "{cm:LaunchProgram,PDF Cropper}"; Flags: nowait postinstall skipifsilent
+; an update from the app itself (/SILENT /RELAUNCH=1): the app opens again,
+; as the user who runs it also when Setup runs as administrator
+Filename: "{app}\pdf-cropper.exe"; Flags: nowait runasoriginaluser; Check: RelaunchAfterUpdate
 
 [Code]
+function RelaunchAfterUpdate(): Boolean;
+begin
+  Result := ExpandConstant('{param:RELAUNCH|0}') = '1';
+end;
 function AppLanguage(Param: String): String;
 begin
   if ActiveLanguage = 'italian' then

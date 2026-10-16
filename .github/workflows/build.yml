@@ -78,7 +78,6 @@ jobs:
           I=dist/pdf-cropper/_internal
           test -f "$I/gi_typelibs/Gtk-4.0.typelib"
           test -f "$I/gi_typelibs/Adw-1.typelib"
-          test -f "$I/gi_typelibs/GdkWin32-4.0.typelib"   # the text follows 250% monitors
           ls "$I"/libadwaita-1-*.dll
           ls "$I"/libgtk-4-*.dll
           test -f "$I/pypdfium2_raw/pdfium.dll"   # the PDF engine
@@ -158,6 +157,21 @@ jobs:
           $version = if ($env:GITHUB_REF_NAME -like 'v*') { $env:GITHUB_REF_NAME.Substring(1) } else { 'dev' }
           & $iscc "/DAppVersion=$version" "installer\pdf-cropper.iss"
           if ($LASTEXITCODE -ne 0) { exit 1 }
+      - name: Update as the app does (silent, the app opens again)
+        shell: pwsh
+        run: |
+          $setup = (Get-ChildItem installer\Output -Filter 'pdf-cropper-setup-*.exe' | Select-Object -First 1).FullName
+          $opts = '/VERYSILENT', '/CURRENTUSER', '/SUPPRESSMSGBOXES', '/NORESTART'
+          # Start-Process -Wait would wait for the app Setup opens too
+          $p = Start-Process $setup -ArgumentList $opts -PassThru
+          if (-not $p.WaitForExit(300000) -or $p.ExitCode -ne 0) { Write-Error "install: $($p.ExitCode)"; exit 1 }
+          Start-Sleep 5
+          if (Get-Process pdf-cropper -ErrorAction SilentlyContinue) { Write-Error 'opened without /RELAUNCH=1'; exit 1 }
+          $p = Start-Process $setup -ArgumentList ($opts + '/RELAUNCH=1') -PassThru
+          if (-not $p.WaitForExit(300000) -or $p.ExitCode -ne 0) { Write-Error "update: $($p.ExitCode)"; exit 1 }
+          Start-Sleep 15
+          if (-not (Get-Process pdf-cropper -ErrorAction SilentlyContinue)) { Write-Error 'the app was not opened again'; exit 1 }
+          Get-Process pdf-cropper | Stop-Process
       - uses: actions/upload-artifact@v7
         with:
           name: windows-x64

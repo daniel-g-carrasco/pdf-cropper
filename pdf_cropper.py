@@ -973,36 +973,6 @@ def run_gui(argv, settings: Settings) -> int:
             if v is not None:
                 getattr(widget, f"set_margin_{side}")(v)
 
-    def follow_monitor_scale(window):
-        """Windows: GTK scales by whole numbers only, 2 on a 250% monitor;
-        the text makes up for the fraction left out (1.25 there), so it reads
-        as large as in the other apps on that monitor. Icons and spacing stay
-        at GTK's scale. Checked every second: moving from a 200% monitor to a
-        250% one changes nothing GTK itself tells."""
-        import ctypes
-        try:
-            gi.require_version("GdkWin32", "4.0")
-            from gi.repository import GdkWin32
-        except (ImportError, ValueError):
-            return
-        get_dpi = ctypes.windll.user32.GetDpiForWindow
-        get_dpi.argtypes, get_dpi.restype = [ctypes.c_void_p], ctypes.c_uint
-
-        def update():
-            surface, settings = window.get_surface(), Gtk.Settings.get_default()
-            if surface is None or settings is None:
-                return True
-            dpi = get_dpi(GdkWin32.Win32Surface.get_handle(surface))
-            if dpi:
-                factor = dpi / 96 / max(window.get_scale_factor(), 1)
-                value = round(96 * 1024 * factor) if abs(factor - 1) > 0.01 else -1
-                if settings.props.gtk_xft_dpi != value:
-                    settings.props.gtk_xft_dpi = value
-            return True
-
-        window.connect("map", lambda _w: update())
-        GLib.timeout_add_seconds(1, update)
-
     def close_on_escape(window):
         ctl = Gtk.EventControllerKey()
 
@@ -1374,8 +1344,6 @@ def run_gui(argv, settings: Settings) -> int:
                 self.banner.set_child(bbox)
                 content.append(self.banner)
             theme.watch_window(self)
-            if is_win:
-                follow_monitor_scale(self)
 
             # --- drop zone -------------------------------------------------
             btns = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8,
@@ -1862,7 +1830,7 @@ def run_gui(argv, settings: Settings) -> int:
                 self.action = Gtk.Button(label=_("Download and install"))
                 self.action.connect("clicked", self._download)
                 self.status.set_label(_("The installation replaces the current "
-                                        "version; the app will close."))
+                                        "version; the app closes and opens again."))
             else:
                 self.action = Gtk.Button(label=_("Open the download page"))
                 self.action.connect("clicked", self._open_page)
@@ -1931,9 +1899,13 @@ def run_gui(argv, settings: Settings) -> int:
             return False
 
         def _on_downloaded(self, dest):
+            import subprocess
             self.status.set_label(_("Starting the installer…"))
             try:
-                os.startfile(str(dest))
+                # no wizard: the choices of the first installation are kept,
+                # Setup shows its progress and opens the app again
+                subprocess.Popen([str(dest), "/SILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/RELAUNCH=1"],
+                                 close_fds=True)
             except OSError as e:
                 self.status.set_label(_("Cannot start the installer: {error}").format(error=e))
                 self.action.set_sensitive(True)

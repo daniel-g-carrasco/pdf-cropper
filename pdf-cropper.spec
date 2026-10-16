@@ -74,14 +74,6 @@ if WIN:
     else:
         print('WARNING: no CA bundle found: the update check may fail on TLS')
 
-    # GdkWin32: a window's HWND, to read the scale of its monitor (GTK keeps
-    # to whole numbers: the text makes up for 250%)
-    gdkwin32 = prefix / 'lib' / 'girepository-1.0' / 'GdkWin32-4.0.typelib'
-    if gdkwin32.is_file():
-        datas.append((str(gdkwin32), 'gi_typelibs'))
-    else:
-        print('WARNING: GdkWin32-4.0.typelib not found: text will not follow fractional scales')
-
 # Introspection modules the gi hook must collect: a libadwaita app on both
 # systems (on Windows inside a window with the system title bar).
 GI_VERSIONS = {'Gtk': '4.0', 'Gdk': '4.0', 'Adw': '1'}
@@ -97,9 +89,10 @@ a = Analysis(
 
 pyz = PYZ(a.pure)
 
-# Windows: embed our own manifest, which declares per-monitor DPI awareness
-# on top of PyInstaller's defaults (GTK would otherwise switch the process
-# to per-monitor awareness only during its own initialisation).
+# Windows: embed our own manifest, which declares system DPI awareness on
+# top of PyInstaller's defaults, from the first instruction: GTK cannot
+# switch the process to per-monitor awareness, where it would keep to whole
+# scales (see the manifest).
 MANIFEST = os.path.join(SPECPATH, 'build-aux', 'windows', 'pdf-cropper.manifest') if WIN else None
 
 exe = EXE(

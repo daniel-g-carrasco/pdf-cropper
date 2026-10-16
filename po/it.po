@@ -274,8 +274,8 @@ msgstr "Più tardi"
 msgid "Download and install"
 msgstr "Scarica e installa"
 
-msgid "The installation replaces the current version; the app will close."
-msgstr "L'installazione sostituisce la versione attuale; il programma verrà chiuso."
+msgid "The installation replaces the current version; the app closes and opens again."
+msgstr "L'installazione sostituisce la versione attuale; il programma si chiude e si riapre."
 
 msgid "Open the download page"
 msgstr "Apri la pagina di download"
