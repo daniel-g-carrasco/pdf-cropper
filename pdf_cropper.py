@@ -33,6 +33,7 @@ APP_ID = "io.github.daniel_g_carrasco.pdf-cropper"
 APP_NAME = "PDF Cropper"
 GITHUB_REPO = "daniel-g-carrasco/pdf-cropper"
 RELEASES_URL = f"https://github.com/{GITHUB_REPO}/releases"
+DOWNLOADS_URL = f"https://github.com/{GITHUB_REPO}/releases/download/"
 LATEST_RELEASE_API = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 TEXTDOMAIN = "pdf-cropper"
 
@@ -469,13 +470,37 @@ def is_installed_build() -> bool:
 
 
 def pick_asset(assets, installed: bool):
-    """Choose the release asset matching this build: installer or portable zip."""
-    pattern = (r"^pdf-cropper-setup-.*-windows-x64\.exe$" if installed
-               else r"^pdf-cropper-.*-windows-x64-portable\.zip$")
+    """The release asset matching this build: installer or portable zip.
+    A released version (never a CI "dev" build), from this project's own
+    release downloads; the installer, which is run, only with the SHA-256
+    GitHub gives for it."""
+    version = r"v\d+(?:\.\d+){1,3}"
+    pattern = (rf"^pdf-cropper-setup-{version}-windows-x64\.exe$" if installed
+               else rf"^pdf-cropper-{version}-windows-x64-portable\.zip$")
     for a in assets:
-        if re.match(pattern, a.get("name", ""), re.IGNORECASE):
+        if (re.match(pattern, a.get("name", ""), re.IGNORECASE)
+                and a.get("url", "").startswith(DOWNLOADS_URL)
+                and (a.get("sha256") or not installed)):
             return a
     return None
+
+
+UPDATE_FOLDER_PREFIX = "pdf-cropper-update-"
+
+
+def update_download_folder() -> Path:
+    """A new folder of its own for an installer, in the temporary folder."""
+    import tempfile
+    return Path(tempfile.mkdtemp(prefix=UPDATE_FOLDER_PREFIX))
+
+
+def clean_update_downloads() -> None:
+    """The installers of earlier updates, gone (Setup is done with them by
+    the time the app starts again)."""
+    import shutil
+    import tempfile
+    for folder in Path(tempfile.gettempdir()).glob(UPDATE_FOLDER_PREFIX + "*"):
+        shutil.rmtree(folder, ignore_errors=True)
 
 
 def _ssl_context():
@@ -523,21 +548,30 @@ def fetch_latest_release(timeout: float = 15.0) -> dict:
         "notes": data.get("body") or "",
         "assets": [
             {"name": a.get("name", ""), "url": a.get("browser_download_url", ""),
-             "size": int(a.get("size") or 0)}
+             "size": int(a.get("size") or 0),
+             # GitHub's checksum of the file, "sha256:<hex>"
+             "sha256": str(a.get("digest") or "").removeprefix("sha256:")
+             if str(a.get("digest") or "").startswith("sha256:") else ""}
             for a in data.get("assets", [])
         ],
     }
 
 
-def download_file(url: str, dest: Path, progress=None, cancelled=None) -> Path:
-    """Download url to dest. progress(done, total) is called along the way;
-    cancelled is an optional threading.Event."""
+def download_file(url: str, dest: Path, progress=None, cancelled=None, sha256: str = "", size: int = 0) -> Path:
+    """Download url to dest, checked against its size and its SHA-256: a file
+    that does not match is removed, and without a SHA-256 nothing is
+    downloaded. progress(done, total) is called along the way; cancelled is
+    an optional threading.Event."""
+    import hashlib
     import urllib.error
+    if not sha256:
+        raise UpdateError(_("the release gives no checksum for the installer: not downloaded"), reached=True)
     dest = Path(dest)
     tmp = dest.with_name(dest.name + ".part")
+    digest = hashlib.sha256()
     try:
         with _http_get(url, timeout=30) as resp, open(tmp, "wb") as out:
-            total = int(resp.headers.get("Content-Length") or 0)
+            total = int(resp.headers.get("Content-Length") or size or 0)
             done = 0
             while True:
                 if cancelled is not None and cancelled.is_set():
@@ -546,9 +580,13 @@ def download_file(url: str, dest: Path, progress=None, cancelled=None) -> Path:
                 if not chunk:
                     break
                 out.write(chunk)
+                digest.update(chunk)
                 done += len(chunk)
                 if progress:
                     progress(done, total)
+        # a connection cut short ends the reading without an error
+        if (size and done != size) or digest.hexdigest().lower() != sha256.lower():
+            raise UpdateError(_("the file downloaded does not match the release: not started"), reached=True)
         tmp.replace(dest)
         return dest
     except urllib.error.HTTPError as e:
@@ -1422,6 +1460,7 @@ def run_gui(argv, settings: Settings) -> int:
             """One-shot tasks after the window is on screen (Windows only:
             the daily update check)."""
             if is_win:
+                threading.Thread(target=clean_update_downloads, daemon=True).start()
                 today = date.today().isoformat()
                 if (self.settings.get_bool("check_updates")
                         and self.settings.get("last_update_check") != today):
@@ -1826,20 +1865,20 @@ def run_gui(argv, settings: Settings) -> int:
             self.close()
 
         def _download(self, _btn):
-            import tempfile
             self.action.set_sensitive(False)
             self.progress.set_visible(True)
             self.progress.set_fraction(0)
             self.status.set_label(_("Downloading…"))
-            dest = Path(tempfile.gettempdir()) / self.asset["name"]
 
             def progress(done, total):
                 GLib.idle_add(self._on_progress, done, total)
 
             def work():
                 try:
-                    download_file(self.asset["url"], dest, progress, self._cancel)
-                except UpdateError as e:
+                    dest = update_download_folder() / self.asset["name"]
+                    download_file(self.asset["url"], dest, progress, self._cancel,
+                                  sha256=self.asset.get("sha256", ""), size=self.asset.get("size", 0))
+                except Exception as e:  # whatever it is, said: never stuck on "Downloading…"
                     GLib.idle_add(self._on_error, str(e))
                     return
                 GLib.idle_add(self._on_downloaded, dest)

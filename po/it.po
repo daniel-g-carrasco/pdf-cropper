@@ -50,6 +50,12 @@ msgstr "annullato"
 msgid "download failed ({code})"
 msgstr "download fallito ({code})"
 
+msgid "the release gives no checksum for the installer: not downloaded"
+msgstr "la versione pubblicata non indica l'impronta dell'installer: non è stato scaricato"
+
+msgid "the file downloaded does not match the release: not started"
+msgstr "il file scaricato non corrisponde alla versione pubblicata: non è stato avviato"
+
 msgid "Installed version: {version}"
 msgstr "Versione installata: {version}"
 
