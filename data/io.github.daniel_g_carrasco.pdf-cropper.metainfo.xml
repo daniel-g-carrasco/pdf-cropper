@@ -71,6 +71,21 @@
   </requires>
 
   <releases>
+    <release version="1.1.0" date="2026-10-16">
+      <description>
+        <p>Windows: the same libadwaita interface as on Linux, inside the system
+           title bar, so the window snaps to the screen edges and to Win+arrows
+           like any other; preferences and update dialogs in libadwaita too.
+           Updates: the installer is downloaded only from this project's
+           releases and started only if its SHA-256 matches the release.</p>
+        <p xml:lang="it">Windows: la stessa interfaccia libadwaita di Linux, dentro la
+           barra del titolo di sistema, così la finestra si aggancia ai bordi dello
+           schermo e con Win+frecce come tutte le altre; anche preferenze e
+           aggiornamenti in libadwaita. Aggiornamenti: l'installer si scarica solo
+           dalle release del progetto e si avvia solo se la sua impronta SHA-256
+           corrisponde.</p>
+      </description>
+    </release>
     <release version="1.0.0" date="2026-10-02">
       <description>
         <p>First release: drag and drop cropping of files and folders, adjustable
