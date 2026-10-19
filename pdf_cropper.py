@@ -1034,6 +1034,35 @@ _CSS_ADW = b"""
 """
 
 
+def larger_system_font(factor: float = 7 / 6) -> None:
+    """Windows: the system font a size larger (Segoe UI 9 -> 10.5 points).
+    libadwaita is drawn for an 11-point font, and at 100% the smaller text it
+    derives from the system's 9 points (subtitles, captions) is hard to read.
+    The factor applies to the size Windows gives, so a larger text size
+    chosen in Windows' settings is followed, also when it changes."""
+    from gi.repository import Gtk, Pango
+    settings = Gtk.Settings.get_default()
+    if settings is None:
+        return
+    ours = [""]
+
+    def apply(*_args):
+        name = settings.props.gtk_font_name
+        if not name or name == ours[0]:
+            return
+        font = Pango.FontDescription.from_string(name)
+        size = font.get_size()
+        if size <= 0 or font.get_size_is_absolute():
+            return
+        half_point = Pango.SCALE // 2
+        font.set_size(round(size * factor / half_point) * half_point)
+        ours[0] = font.to_string()
+        settings.props.gtk_font_name = ours[0]
+
+    apply()
+    settings.connect("notify::gtk-font-name", apply)
+
+
 def run_gui(argv, settings: Settings) -> int:
     is_win = sys.platform == "win32"
     # The Windows title bar (system decorations): GTK honours GTK_CSD only
@@ -2283,6 +2312,8 @@ def run_gui(argv, settings: Settings) -> int:
         def do_startup(self):
             nonlocal theme
             AppBase.do_startup(self)
+            if is_win:
+                larger_system_font()
             _mark("startup")
             display = Gdk.Display.get_default()
             bundle = getattr(sys, "_MEIPASS", None)
