@@ -80,7 +80,7 @@ def main() -> None:
     master.save(out / "icon.png")
     master.save(
         out / "icon.ico",
-        sizes=[(16, 16), (24, 24), (32, 32), (48, 48),
+        sizes=[(16, 16), (20, 20), (24, 24), (32, 32), (48, 48),
                (64, 64), (128, 128), (256, 256)],
     )
     print(f"written: {out / 'icon.ico'} and icon.png")

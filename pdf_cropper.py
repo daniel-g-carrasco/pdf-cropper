@@ -869,9 +869,56 @@ def win_bring_to_front(title: str) -> None:
     user32.EnumWindows(visit, 0)
 
 
+_WIN_ICONS: dict = {}  # kept for the life of the process: a window does not copy its icon
+
+
+def win_window_icons() -> None:
+    """Give this process's windows the exe's own icon at the sizes Windows
+    draws for each window's DPI (the title bar's small one, Alt+Tab's big
+    one). GTK hands Windows a 48-pixel icon, which the title bar shrinks
+    badly to 16; the exe's .ico holds 16, 20, 24 ... drawn for each size.
+    Only for the built app: a run from the sources has no icon of its own."""
+    if not getattr(sys, "frozen", False):
+        return
+    try:
+        import ctypes
+        from ctypes import wintypes
+        user32 = ctypes.windll.user32
+    except (AttributeError, OSError):
+        return
+    exe = os.path.normpath(sys.executable)
+    user32.GetDpiForWindow.argtypes = [wintypes.HWND]
+    user32.GetSystemMetricsForDpi.argtypes = [ctypes.c_int, wintypes.UINT]
+    user32.SendMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
+    user32.SendMessageW.restype = wintypes.LPARAM
+    pid = os.getpid()
+
+    def icon(size):
+        if size not in _WIN_ICONS:
+            handles, ids = (wintypes.HICON * 1)(), (wintypes.UINT * 1)()
+            got = user32.PrivateExtractIconsW(exe, 0, size, size, handles, ids, 1, 0)
+            _WIN_ICONS[size] = (handles[0] or 0) if got == 1 else 0
+        return _WIN_ICONS[size]
+
+    @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+    def visit(hwnd, _lparam):
+        owner = wintypes.DWORD()
+        user32.GetWindowThreadProcessId(hwnd, ctypes.byref(owner))
+        if owner.value == pid:
+            dpi = user32.GetDpiForWindow(hwnd) or 96
+            for kind, metric in ((0, 49), (1, 11)):  # ICON_SMALL/SM_CXSMICON, ICON_BIG/SM_CXICON
+                handle = icon(user32.GetSystemMetricsForDpi(metric, dpi))
+                if handle:
+                    user32.SendMessageW(hwnd, 0x0080, kind, handle)  # WM_SETICON
+        return 1
+
+    user32.EnumWindows(visit, 0)
+
+
 def win_dark_titlebars(dark: bool) -> None:
     """Ask DWM to paint the native title bars of this process dark or light
-    (Windows 10 1809+; silently ignored elsewhere)."""
+    (Windows 10 1809+; silently ignored elsewhere), and give them the exe's
+    icon at the title bar's size."""
     try:
         import ctypes
         from ctypes import wintypes
@@ -893,6 +940,7 @@ def win_dark_titlebars(dark: bool) -> None:
         return 1
 
     user32.EnumWindows(visit, 0)
+    win_window_icons()
 
 
 # ---------------------------------------------------------------------------
