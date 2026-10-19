@@ -473,14 +473,15 @@ def pick_asset(assets, installed: bool):
     """The release asset matching this build: installer or portable zip.
     A released version (never a CI "dev" build), from this project's own
     release downloads; the installer, which is run, only with the SHA-256
-    GitHub gives for it."""
+    GitHub gives for it and its minisign signature, a file of the release."""
     version = r"v\d+(?:\.\d+){1,3}"
     pattern = (rf"^pdf-cropper-setup-{version}-windows-x64\.exe$" if installed
                else rf"^pdf-cropper-{version}-windows-x64-portable\.zip$")
     for a in assets:
         if (re.match(pattern, a.get("name", ""), re.IGNORECASE)
                 and a.get("url", "").startswith(DOWNLOADS_URL)
-                and (a.get("sha256") or not installed)):
+                and ((a.get("sha256") and a.get("signature_url", "").startswith(DOWNLOADS_URL))
+                     or not installed)):
             return a
     return None
 
@@ -527,7 +528,8 @@ def _http_get(url: str, timeout: float = 15.0):
 
 
 def fetch_latest_release(timeout: float = 15.0) -> dict:
-    """Return {"version", "tag", "url", "notes", "assets": [{"name", "url", "size"}]}."""
+    """Return {"version", "tag", "url", "notes", "assets": [{"name", "url", "size",
+    "sha256", "signature_url"}]}."""
     import json
     import urllib.error
     try:
@@ -541,6 +543,7 @@ def fetch_latest_release(timeout: float = 15.0) -> dict:
     tag = str(data.get("tag_name") or "")
     if not tag:
         raise UpdateError(_("unexpected answer from the server"), reached=True)
+    signatures = {a.get("name", ""): a.get("browser_download_url", "") for a in data.get("assets", [])}
     return {
         "version": tag.lstrip("vV"),
         "tag": tag,
@@ -551,25 +554,142 @@ def fetch_latest_release(timeout: float = 15.0) -> dict:
              "size": int(a.get("size") or 0),
              # GitHub's checksum of the file, "sha256:<hex>"
              "sha256": str(a.get("digest") or "").removeprefix("sha256:")
-             if str(a.get("digest") or "").startswith("sha256:") else ""}
+             if str(a.get("digest") or "").startswith("sha256:") else "",
+             # its minisign signature, a file of the release of its own
+             "signature_url": signatures.get(a.get("name", "") + ".minisig", "")}
             for a in data.get("assets", [])
         ],
     }
 
 
-def download_file(url: str, dest: Path, progress=None, cancelled=None, sha256: str = "", size: int = 0) -> Path:
-    """Download url to dest, checked against its size and its SHA-256: a file
-    that does not match is removed, and without a SHA-256 nothing is
-    downloaded. progress(done, total) is called along the way; cancelled is
-    an optional threading.Event."""
+# --- minisign: the signature of the releases ----------------------------------
+# The release workflow signs the files of a release with minisign (the key's
+# secret half is the repository's MINISIGN_SECRET_KEY), and an update runs
+# only an installer signed with it: an installer replaced in the release,
+# with its digest, is refused. Verified with the standard library: Ed25519
+# from RFC 8032's reference verification, over minisign's prehashed form
+# (the BLAKE2b-512 of the file), and the global signature over the trusted
+# comment, which names the file.
+
+UPDATE_PUBLIC_KEY = "RWRF+AifJvn/zhz0o7MBObIYHgw9+sWoc4GaBK+qYnJY0AqeJm540y0a"     # key id CEFFF9269F08F845
+
+_ED_P = 2 ** 255 - 19
+_ED_L = 2 ** 252 + 27742317777372353535851937790883648493        # the group's order
+_ED_D = -121665 * pow(121666, _ED_P - 2, _ED_P) % _ED_P
+_ED_SQRT_M1 = pow(2, (_ED_P - 1) // 4, _ED_P)
+
+
+def _ed_add(a, b):
+    """Two points in extended coordinates (X, Y, Z, T)."""
+    p = _ED_P
+    e, h = (a[1] - a[0]) * (b[1] - b[0]) % p, (a[1] + a[0]) * (b[1] + b[0]) % p
+    c, d = 2 * a[3] * b[3] * _ED_D % p, 2 * a[2] * b[2] % p
+    e, f, g, h = h - e, d - c, d + c, h + e
+    return e * f, g * h, f * g, e * h
+
+
+def _ed_multiply(s, point):
+    result = (0, 1, 1, 0)
+    while s > 0:
+        if s & 1:
+            result = _ed_add(result, point)
+        point = _ed_add(point, point)
+        s >>= 1
+    return result
+
+
+def _ed_x(y, sign):
+    p = _ED_P
+    if y >= p:
+        return None
+    x2 = (y * y - 1) * pow(_ED_D * y * y + 1, p - 2, p) % p
+    if x2 == 0:
+        return None if sign else 0
+    x = pow(x2, (p + 3) // 8, p)
+    if (x * x - x2) % p:
+        x = x * _ED_SQRT_M1 % p
+    if (x * x - x2) % p:
+        return None
+    return p - x if (x & 1) != sign else x
+
+
+def _ed_point(data: bytes):
+    if len(data) != 32:
+        return None
+    y = int.from_bytes(data, "little")
+    sign, y = y >> 255, y & ((1 << 255) - 1)
+    x = _ed_x(y, sign)
+    return None if x is None else (x, y, 1, x * y % _ED_P)
+
+
+def ed25519_verify(public: bytes, message: bytes, signature: bytes) -> bool:
+    import hashlib
+    if len(signature) != 64:
+        return False
+    a, r = _ed_point(public), _ed_point(signature[:32])
+    s = int.from_bytes(signature[32:], "little")
+    if a is None or r is None or s >= _ED_L:
+        return False
+    p, gy = _ED_P, 4 * pow(5, _ED_P - 2, _ED_P) % _ED_P
+    gx = _ed_x(gy, 0)
+    k = int.from_bytes(hashlib.sha512(signature[:32] + public + message).digest(), "little") % _ED_L
+    left, right = _ed_multiply(s, (gx, gy, 1, gx * gy % p)), _ed_add(r, _ed_multiply(k, a))
+    return (left[0] * right[2] - right[0] * left[2]) % p == 0 and (left[1] * right[2] - right[1] * left[2]) % p == 0
+
+
+def minisign_verify(digest: bytes, signature: str, public_key: str) -> str:
+    """The trusted comment of a minisign signature (a .minisig file's text)
+    of a file whose BLAKE2b-512 is digest, made with the key whose public
+    half is public_key (the base64 line of minisign.pub); ValueError when
+    it is not."""
+    import base64
+
+    def decode(text: str, length: int) -> bytes:
+        try:
+            data = base64.b64decode(text.strip(), validate=True)
+        except ValueError:
+            data = b""
+        if len(data) != length:
+            raise ValueError("not a minisign signature or key")
+        return data
+
+    lines = [line.rstrip("\r") for line in signature.split("\n")]
+    if len(lines) < 4 or not lines[0].startswith("untrusted comment:") \
+            or not lines[2].startswith("trusted comment: "):
+        raise ValueError("not a minisign signature")
+    key, sig, global_sig = decode(public_key, 42), decode(lines[1], 74), decode(lines[3], 64)
+    # "ED": prehashed; "Ed", the legacy form over the whole file, is never made here
+    if key[:2] != b"Ed" or sig[:2] != b"ED":
+        raise ValueError("not a prehashed Ed25519 signature")
+    if sig[2:10] != key[2:10]:
+        raise ValueError("signed with another key")
+    trusted = lines[2][len("trusted comment: "):]
+    if not ed25519_verify(key[10:], digest, sig[10:]):
+        raise ValueError("the signature does not match the file")
+    if not ed25519_verify(key[10:], sig[10:] + trusted.encode("utf-8"), global_sig):
+        raise ValueError("the signature does not match its trusted comment")
+    return trusted
+
+
+def download_file(url: str, dest: Path, progress=None, cancelled=None, sha256: str = "", size: int = 0,
+                  signature_url: str = "") -> Path:
+    """Download url to dest, checked against its size, its SHA-256 and its
+    minisign signature (signature_url: made with UPDATE_PUBLIC_KEY, for
+    dest's file name): a file that does not match is removed, and without a
+    SHA-256 or a signature nothing is downloaded. progress(done, total) is
+    called along the way; cancelled is an optional threading.Event."""
     import hashlib
     import urllib.error
     if not sha256:
         raise UpdateError(_("the release gives no checksum for the installer: not downloaded"), reached=True)
+    if not signature_url:
+        raise UpdateError(_("the release gives no signature for the installer: not downloaded"), reached=True)
     dest = Path(dest)
     tmp = dest.with_name(dest.name + ".part")
-    digest = hashlib.sha256()
+    digest, signed = hashlib.sha256(), hashlib.blake2b(digest_size=64)
     try:
+        with _http_get(signature_url, timeout=30) as resp:
+            signature = resp.read(4096).decode("utf-8", "replace")
         with _http_get(url, timeout=30) as resp, open(tmp, "wb") as out:
             total = int(resp.headers.get("Content-Length") or size or 0)
             done = 0
@@ -581,12 +701,21 @@ def download_file(url: str, dest: Path, progress=None, cancelled=None, sha256: s
                     break
                 out.write(chunk)
                 digest.update(chunk)
+                signed.update(chunk)
                 done += len(chunk)
                 if progress:
                     progress(done, total)
         # a connection cut short ends the reading without an error
         if (size and done != size) or digest.hexdigest().lower() != sha256.lower():
             raise UpdateError(_("the file downloaded does not match the release: not started"), reached=True)
+        # signed with this project's key, for this very file: another
+        # release's installer, signed too, is not this one
+        try:
+            trusted = minisign_verify(signed.digest(), signature, UPDATE_PUBLIC_KEY)
+        except ValueError:
+            trusted = ""
+        if f"file:{dest.name}" not in trusted.split():
+            raise UpdateError(_("the installer's signature is not valid: not started"), reached=True)
         tmp.replace(dest)
         return dest
     except urllib.error.HTTPError as e:
@@ -1877,7 +2006,8 @@ def run_gui(argv, settings: Settings) -> int:
                 try:
                     dest = update_download_folder() / self.asset["name"]
                     download_file(self.asset["url"], dest, progress, self._cancel,
-                                  sha256=self.asset.get("sha256", ""), size=self.asset.get("size", 0))
+                                  sha256=self.asset.get("sha256", ""), size=self.asset.get("size", 0),
+                                  signature_url=self.asset.get("signature_url", ""))
                 except Exception as e:  # whatever it is, said: never stuck on "Downloading…"
                     GLib.idle_add(self._on_error, str(e))
                     return

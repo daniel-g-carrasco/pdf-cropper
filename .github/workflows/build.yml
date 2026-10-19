@@ -269,6 +269,29 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           merge-multiple: true
+      - name: Sign with the project's key (minisign), checked before anything is uploaded
+        # the installed app runs an update only with this signature (the same
+        # public key is in the code); the comment names the file, so another
+        # release's installer is not taken for this one
+        env:
+          MINISIGN_SECRET_KEY: ${{ secrets.MINISIGN_SECRET_KEY }}
+          PUBLIC_KEY: RWRF+AifJvn/zhz0o7MBObIYHgw9+sWoc4GaBK+qYnJY0AqeJm540y0a
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq minisign
+          key="$RUNNER_TEMP/minisign.key"
+          (umask 077
+           case "$MINISIGN_SECRET_KEY" in
+             "untrusted comment:"*) printf '%s\n' "$MINISIGN_SECRET_KEY" ;;
+             *) printf 'untrusted comment: releases\n%s\n' "$MINISIGN_SECRET_KEY" ;;
+           esac | tr -d '\r' > "$key")
+          ls *-setup-v*-windows-x64.exe
+          for f in *.zip *.tar.gz *.exe *.flatpak; do
+            [ -f "$f" ] || continue
+            minisign -S -s "$key" -m "$f" -x "$f.minisig" -t "timestamp:$(date +%s) file:$f hashed" </dev/null
+            minisign -V -P "$PUBLIC_KEY" -m "$f" -x "$f.minisig"
+          done
+          rm -f "$key"
       - uses: softprops/action-gh-release@v3
         with:
           files: |
@@ -276,4 +299,5 @@ jobs:
             *.tar.gz
             *.exe
             *.flatpak
+            *.minisig
           generate_release_notes: true

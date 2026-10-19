@@ -46,6 +46,17 @@ Everything (GTK and the PDF engine included) ships inside the packages. The
 installer defaults to a per-user install, so no administrator rights are
 needed there either.
 
+Since 1.1.3 every file of a release is signed with
+[minisign](https://jedisct1.github.io/minisign/), and the installed app
+checks the signature of an update before running it. To check a download by
+hand:
+
+    minisign -Vm <file> -P RWRF+AifJvn/zhz0o7MBObIYHgw9+sWoc4GaBK+qYnJY0AqeJm540y0a
+
+The same key signs P7M Extractor, PDF Cropper and Cartiglio. It is not an
+Authenticode signature: Windows' SmartScreen still warns about the
+installer.
+
 ## Run from source
 
 Python ≥ 3.9, [pypdfium2](https://github.com/pypdfium2-team/pypdfium2) and,
