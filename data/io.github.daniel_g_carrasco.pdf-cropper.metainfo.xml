@@ -71,6 +71,16 @@
   </requires>
 
   <releases>
+    <release version="1.1.3" date="2026-10-19">
+      <description>
+        <p>Signed updates: every file of a release carries a minisign signature, and
+           the app runs the installer of an update only when it is signed with the
+           project's key, for that very file.</p>
+        <p xml:lang="it">Aggiornamenti firmati: ogni file della release ha una firma minisign, e il
+           programma avvia l'installer di un aggiornamento solo se è firmato con la
+           chiave del progetto, proprio per quel file.</p>
+      </description>
+    </release>
     <release version="1.1.2" date="2026-10-16">
       <description>
         <p>Windows: on a monitor whose scale differs from the main one (a 250%

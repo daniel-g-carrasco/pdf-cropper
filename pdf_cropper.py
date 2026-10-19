@@ -27,7 +27,7 @@ from datetime import date
 from pathlib import Path
 from typing import NamedTuple
 
-__version__ = "1.1.2"
+__version__ = "1.1.3"
 
 APP_ID = "io.github.daniel_g_carrasco.pdf-cropper"
 APP_NAME = "PDF Cropper"
