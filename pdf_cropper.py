@@ -27,7 +27,7 @@ from datetime import date
 from pathlib import Path
 from typing import NamedTuple
 
-__version__ = "1.1.4"
+__version__ = "1.1.5"
 
 APP_ID = "io.github.daniel_g_carrasco.pdf-cropper"
 APP_NAME = "PDF Cropper"
@@ -943,6 +943,60 @@ def win_dark_titlebars(dark: bool) -> None:
     win_window_icons()
 
 
+def win_watch_quirks(win) -> None:
+    """Two quirks of GTK 4.24 on Windows, worked around per window (measured
+    2026-11-06 on GTK 4.24.1; nothing here is needed once GTK fixes them).
+    A restore made by Windows (the title bar's button, Win+Down, a double
+    click on the title bar) after a maximize() from GTK leaves the window as
+    big as the screen while GTK keeps its surface at the maximized size and
+    remembers the old one: from there borders drag wrong. Done again through
+    GTK, maximize() then unmaximize(), the window gets its size back. And a
+    popover open when the window is minimized comes back without its grab
+    (no click outside closes it): closed on the resume, it is gone."""
+    from gi.repository import GLib, Gtk
+    remembered = {}
+
+    def popovers_below(widget):
+        child = widget.get_first_child()
+        while child is not None:
+            if isinstance(child, Gtk.Popover):
+                yield child
+            yield from popovers_below(child)
+            child = child.get_next_sibling()
+
+    def on_maximized(w, _pspec):
+        if w.is_maximized():
+            remembered["size"] = w.get_default_size()
+            return
+        size = remembered.get("size")
+        if size is None:
+            return
+
+        def check():
+            surface = w.get_surface()
+            if w.is_maximized() or surface is None or remembered.get("size") != size:
+                return False
+            width, height = size
+            if surface.get_width() > width + 20 or surface.get_height() > height + 20:
+                remembered.pop("size", None)
+                w.maximize()
+                GLib.timeout_add(60, lambda: (w.unmaximize(), False)[1])
+            return False
+        GLib.timeout_add(80, check)
+
+    def on_suspended(w, _pspec):
+        if not w.get_property("suspended"):
+            def close():
+                for popover in popovers_below(w):
+                    if popover.get_visible():
+                        popover.popdown()
+                return False
+            GLib.timeout_add(150, close)
+
+    win.connect("notify::maximized", on_maximized)
+    win.connect("notify::suspended", on_suspended)
+
+
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
@@ -1323,9 +1377,11 @@ def run_gui(argv, settings: Settings) -> int:
                 win_dark_titlebars(self.dark)
 
         def watch_window(self, win):
-            """Paint the native title bar of a new window in the right shade."""
+            """Paint the native title bar of a new window in the right shade,
+            and work around GTK 4.24's restore and popover quirks."""
             if is_win:
                 win.connect("map", lambda _w: win_dark_titlebars(self.dark))
+                win_watch_quirks(win)
 
         def _system_prefers_dark(self):
             if is_win:
