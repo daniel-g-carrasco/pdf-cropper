@@ -946,18 +946,67 @@ def win_dark_titlebars(dark: bool) -> None:
 def win_watch_quirks(win) -> None:
     """Three quirks of GTK 4.24 on Windows, worked around per window (measured
     2026-11-06 on GTK 4.24.1; nothing here is needed once GTK fixes them).
-    A window maximized by Windows (the title bar's button, Win+Up) is put
-    back to its normal size by the first popover that opens, while GTK and
-    Windows still call it maximized: made GTK's own at once (maximize()), it
-    keeps its size. A restore made by Windows (the title bar's button, Win+Down, a double
-    click on the title bar) after a maximize() from GTK leaves the window as
-    big as the screen while GTK keeps its surface at the maximized size and
-    remembers the old one: from there borders drag wrong. Done again through
-    GTK, maximize() then unmaximize(), the window gets its size back. And a
+    A window maximized by Windows (the title bar's button, Win+Up, a drag to
+    the top edge) is put back to its normal size by the first popover that
+    opens, while GTK and Windows still call it maximized: made GTK's own
+    (maximize()), it keeps its size. A restore made by Windows (the title
+    bar's button, Win+Down, a double click on the title bar) after a maximize
+    from GTK leaves the window as big as the screen while GTK keeps its
+    surface at the maximized size and remembers the old one: from there
+    borders drag wrong. Done again through GTK, maximize() then unmaximize(),
+    the window gets its size back. Both only once Windows is done with the
+    window (not during a move or a drag, a restore by dragging the title bar
+    happens in the middle of one; not with the button held), judged on the
+    window's own size (GetWindowRect), not the surface's, which lags. And a
     popover open when the window is minimized comes back without its grab
     (no click outside closes it): closed on the resume, it is gone."""
+    import ctypes
+    from ctypes import wintypes
     from gi.repository import GLib, Gtk
+    user32, kernel32 = ctypes.windll.user32, ctypes.windll.kernel32
     remembered = {}
+
+    class RECT(ctypes.Structure):
+        _fields_ = [("left", ctypes.c_long), ("top", ctypes.c_long), ("right", ctypes.c_long), ("bottom", ctypes.c_long)]
+
+    class GUITHREADINFO(ctypes.Structure):
+        _fields_ = [("cbSize", wintypes.DWORD), ("flags", wintypes.DWORD), ("hwndActive", wintypes.HWND),
+                    ("hwndFocus", wintypes.HWND), ("hwndCapture", wintypes.HWND), ("hwndMenuOwner", wintypes.HWND),
+                    ("hwndMoveSize", wintypes.HWND), ("hwndCaret", wintypes.HWND), ("rcCaret", RECT)]
+
+    def hwnd_of():
+        try:
+            import gi
+            gi.require_version("GdkWin32", "4.0")
+            from gi.repository import GdkWin32
+            return int(GdkWin32.Win32Surface.get_handle(win.get_surface()))
+        except Exception:       # no typelib, no method in this GTK: the title is the next best thing
+            user32.FindWindowW.restype = wintypes.HWND
+            return int(user32.FindWindowW(None, win.get_title() or "") or 0)
+
+    def busy():
+        """A move or a resize in progress (Windows' own loop), or the button still down."""
+        info = GUITHREADINFO(cbSize=ctypes.sizeof(GUITHREADINFO))
+        if user32.GetGUIThreadInfo(kernel32.GetCurrentThreadId(), ctypes.byref(info)) and info.flags & 0x2:
+            return True
+        return bool(user32.GetAsyncKeyState(0x01) & 0x8000)
+
+    def pixels():
+        hwnd, rect = hwnd_of(), RECT()
+        if not hwnd or not user32.GetWindowRect(wintypes.HWND(hwnd), ctypes.byref(rect)):
+            return 0, 0
+        return rect.right - rect.left, rect.bottom - rect.top
+
+    def when_settled(then):
+        tries = {"left": 50}                    # at most 5 s
+
+        def look():
+            tries["left"] -= 1
+            if busy() and tries["left"] > 0:
+                return True
+            then()
+            return False
+        GLib.timeout_add(100, look)
 
     def popovers_below(widget):
         child = widget.get_first_child()
@@ -969,12 +1018,15 @@ def win_watch_quirks(win) -> None:
 
     def on_maximized(w, _pspec):
         if w.is_maximized():
-            if not remembered.get("own"):
-                # made by Windows: GTK's own from now on, or the first popover
-                # puts the window back to its normal size
-                remembered["own"] = True
-                remembered["size"] = w.get_default_size()
-                w.maximize()
+            if remembered.get("own"):
+                return
+            remembered["own"] = True
+            remembered["size"] = w.get_default_size()
+
+            def make_own():
+                if w.is_maximized() and remembered.get("own"):
+                    w.maximize()
+            when_settled(make_own)
             return
         remembered.pop("own", None)
         size = remembered.get("size")
@@ -984,14 +1036,15 @@ def win_watch_quirks(win) -> None:
         def check():
             surface = w.get_surface()
             if w.is_maximized() or surface is None or remembered.get("size") != size:
-                return False
+                return
             width, height = size
-            if surface.get_width() > width + 20 or surface.get_height() > height + 20:
+            scale = surface.get_scale_factor() or 1
+            px = pixels()
+            if px[0] > (width + 20) * scale or px[1] > (height + 20) * scale:
                 remembered.pop("size", None)
                 w.maximize()
                 GLib.timeout_add(60, lambda: (w.unmaximize(), False)[1])
-            return False
-        GLib.timeout_add(80, check)
+        when_settled(check)
 
     def on_suspended(w, _pspec):
         if not w.get_property("suspended"):
