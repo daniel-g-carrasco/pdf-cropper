@@ -944,9 +944,12 @@ def win_dark_titlebars(dark: bool) -> None:
 
 
 def win_watch_quirks(win) -> None:
-    """Two quirks of GTK 4.24 on Windows, worked around per window (measured
+    """Three quirks of GTK 4.24 on Windows, worked around per window (measured
     2026-11-06 on GTK 4.24.1; nothing here is needed once GTK fixes them).
-    A restore made by Windows (the title bar's button, Win+Down, a double
+    A window maximized by Windows (the title bar's button, Win+Up) is put
+    back to its normal size by the first popover that opens, while GTK and
+    Windows still call it maximized: made GTK's own at once (maximize()), it
+    keeps its size. A restore made by Windows (the title bar's button, Win+Down, a double
     click on the title bar) after a maximize() from GTK leaves the window as
     big as the screen while GTK keeps its surface at the maximized size and
     remembers the old one: from there borders drag wrong. Done again through
@@ -966,8 +969,14 @@ def win_watch_quirks(win) -> None:
 
     def on_maximized(w, _pspec):
         if w.is_maximized():
-            remembered["size"] = w.get_default_size()
+            if not remembered.get("own"):
+                # made by Windows: GTK's own from now on, or the first popover
+                # puts the window back to its normal size
+                remembered["own"] = True
+                remembered["size"] = w.get_default_size()
+                w.maximize()
             return
+        remembered.pop("own", None)
         size = remembered.get("size")
         if size is None:
             return

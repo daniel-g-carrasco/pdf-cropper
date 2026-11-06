@@ -76,7 +76,9 @@
         <p>Windows: a window restored from maximized with Windows' own button stayed as
            big as the screen and could not be resized any more, and a menu left open
            when the window was minimized came back and could not be closed by a click
-           outside it: two quirks of GTK 4.24, worked around.</p>
+           outside it; and a window maximized with Windows' own button went back to its
+           normal size as soon as the main menu opened. Three quirks of GTK 4.24,
+           worked around.</p>
       </description>
     </release>
     <release version="1.1.4" date="2026-10-19">
