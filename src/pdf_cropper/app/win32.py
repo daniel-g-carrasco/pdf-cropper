@@ -110,6 +110,10 @@ def win_dark_titlebars(dark: bool, background: tuple[int, int, int] | None = Non
         return
     pid = os.getpid()
     value = ctypes.c_int(1 if dark else 0)
+
+    class MARGINS(ctypes.Structure):
+        _fields_ = [("left", ctypes.c_int), ("right", ctypes.c_int), ("top", ctypes.c_int), ("bottom", ctypes.c_int)]
+
     # DWMWA_CAPTION_COLOR, DWMWA_TEXT_COLOR (Windows 11): a colour is 0x00BBGGRR
     colours = [(attr, wintypes.DWORD(rgb[0] | rgb[1] << 8 | rgb[2] << 16))
                for attr, rgb in ((35, background), (36, text)) if rgb is not None]
@@ -125,6 +129,13 @@ def win_dark_titlebars(dark: bool, background: tuple[int, int, int] | None = Non
                     break
             for attr, colour in colours:
                 dwmapi.DwmSetWindowAttribute(hwnd, attr, ctypes.byref(colour), ctypes.sizeof(colour))
+            # one pixel of DWM's frame under the content, at the top. The
+            # app is system DPI aware (GTK scales by whole numbers only): on a
+            # screen whose scale is not the main one's Windows stretches the
+            # window, and the seam between the title bar and the content
+            # showed what was behind the window
+            if user32.GetWindowLongW(hwnd, -16) & 0x00C00000 == 0x00C00000:     # a window with a title bar
+                dwmapi.DwmExtendFrameIntoClientArea(hwnd, ctypes.byref(MARGINS(0, 0, 1, 0)))
         return 1
 
     user32.EnumWindows(visit, 0)

@@ -48,6 +48,11 @@ _CSS = b"""
     border-radius: 8px;
     padding: 6px 6px 6px 12px;
 }
+/* With the system's title bar: a hairline between it and the content,
+   in the text's colour, faint (the class is given on Windows only). */
+window.system-titlebar headerbar {
+    box-shadow: inset 0 1px alpha(currentColor, 0.09);
+}
 """
 
 # libadwaita: the accent colour it exports; messages are toasts, no banner.
@@ -71,6 +76,11 @@ _CSS_ADW = b"""
 }
 .dropzone .title {
     font-size: 15pt;
+}
+/* With the system's title bar: a hairline between it and the content,
+   in the text's colour, faint (the class is given on Windows only). */
+window.system-titlebar headerbar {
+    box-shadow: inset 0 1px alpha(currentColor, 0.09);
 }
 """
 
@@ -355,6 +365,8 @@ def run_gui(argv, settings: Settings) -> int:
             if is_win:
                 win.connect("map", lambda _w: self._title_bars(False))
                 win_watch_quirks(win)
+                if not use_csd:
+                    win.add_css_class("system-titlebar")    # the hairline under the system's title bar (the CSS)
 
         def _system_prefers_dark(self):
             if is_win:
@@ -521,6 +533,15 @@ def run_gui(argv, settings: Settings) -> int:
             menu.append_section(None, section)
             self.menu_btn = Gtk.MenuButton(icon_name="open-menu-symbolic", menu_model=menu,
                                            primary=True, tooltip_text=_("Main menu (F10)"))
+            if not use_csd:
+                # with the system's title bar the button is the last thing before
+                # the window's edge: the menu's arrow would stand on the menu's
+                # own rounded corner (and off it, with the window half off the
+                # screen). No arrow, the menu's edge on the button's, and the
+                # gap the arrow would have left between the two
+                self.menu_btn.get_popover().set_has_arrow(False)
+                self.menu_btn.get_popover().set_halign(Gtk.Align.END)
+                self.menu_btn.get_popover().set_offset(0, 6)
             header.pack_end(self.menu_btn)
             self.spinner = Gtk.Spinner(tooltip_text=_("Cropping…"))
             header.pack_end(self.spinner)
