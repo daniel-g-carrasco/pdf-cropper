@@ -1,0 +1,16 @@
+#!/usr/bin/python3
+"""Launcher: runs from a source checkout (src/ next to bin/) or from an
+installed copy (the Flatpak puts the package in /app/share/pdf-cropper)."""
+
+import os
+import sys
+
+here = os.path.dirname(os.path.realpath(__file__))
+for candidate in (os.path.join(here, "..", "src"), "/app/share/pdf-cropper"):
+    if os.path.isdir(os.path.join(candidate, "pdf_cropper")):
+        sys.path.insert(0, os.path.abspath(candidate))
+        break
+
+from pdf_cropper.__main__ import main  # noqa: E402
+
+sys.exit(main())

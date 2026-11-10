@@ -78,7 +78,7 @@ jobs:
       - name: Write the .flatpakref, .flatpakrepo and index page
         run: |
           key="$(gpg --batch --export "$FLATPAK_GPG_KEY_ID" | base64 -w0)"
-          version="$(python3 -c 'import pdf_cropper as p; print(p.__version__)')"
+          version="$(python3 -c 'import sys; sys.path.insert(0, "src"); import pdf_cropper as p; print(p.__version__)')"
           python3 tools/flatpak_repo_files.py pages "$BASE_URL" "$key" "$version"
           cp data/icons/hicolor/256x256/apps/io.github.daniel_g_carrasco.pdf-cropper.png pages/icon.png
           echo "version=$version" >> "$GITHUB_ENV"

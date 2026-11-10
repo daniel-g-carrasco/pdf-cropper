@@ -9,9 +9,10 @@ vendor/
 *.tar.gz
 sample.pdf
 sample_cropped.pdf
-gui/
-gui-*/
-gui-*.png
+# the folders of the CI's smoke test, at the root only: src/<package>/gui is the window
+/gui/
+/gui-*/
+/gui-*.png
 locale/
 po/*.pot
 build-dir/

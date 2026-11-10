@@ -47,7 +47,9 @@ modules:
     buildsystem: simple
     build-commands:
       # pure Python, PyGObject and GTK 4 come with the GNOME runtime
-      - install -Dm755 pdf_cropper.py /app/bin/pdf-cropper
+      - install -d /app/share/pdf-cropper
+      - cp -r src/pdf_cropper /app/share/pdf-cropper/pdf_cropper
+      - install -Dm755 bin/pdf-cropper /app/bin/pdf-cropper
       - python3 tools/compile_po.py --dest /app/share/locale
       - install -Dm644 data/io.github.daniel_g_carrasco.pdf-cropper.desktop -t /app/share/applications
       - install -Dm644 data/io.github.daniel_g_carrasco.pdf-cropper.metainfo.xml -t /app/share/metainfo

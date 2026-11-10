@@ -11,9 +11,12 @@ import sys
 import tempfile
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-import pdf_cropper as pc  # noqa: E402
+import pdf_cropper  # noqa: E402
+from pdf_cropper import cli as command_line, i18n  # noqa: E402
+from pdf_cropper.app import crop as cropping, minisign, settings, updates  # noqa: E402
+from pdf_cropper.core import margins  # noqa: E402
 
 # --- tiny PDF builder -------------------------------------------------------
 
@@ -99,40 +102,40 @@ def main() -> int:
         return 0
     if len(sys.argv) == 3 and sys.argv[1] == "--check-sample":
         media, _crop, _rot, _n = boxes(sys.argv[2])
-        assert close_to(media, grown(RECT_BOX, pc.DEFAULT_MARGIN_MM * pc.MM)), media
+        assert close_to(media, grown(RECT_BOX, margins.DEFAULT_MARGIN_MM * margins.MM)), media
         print(f"sample cropped as expected: {[round(v, 1) for v in media]}")
         return 0
 
     # --- ink bounding box on raw greyscale buffers ---------------------------
     w, h = 10, 6
     blank = bytearray(b"\xff" * (w * h))
-    assert pc.ink_bbox(bytes(blank), w, h, w) is None
+    assert margins.ink_bbox(bytes(blank), w, h, w) is None
     img = bytearray(blank)
     img[2 * w + 3] = 0        # (3, 2)
     img[4 * w + 7] = 100      # (7, 4)
     img[1 * w + 9] = 252      # nearly white: paper, at the default threshold
-    assert pc.ink_bbox(bytes(img), w, h, w) == (3, 2, 8, 5)
-    assert pc.ink_bbox(bytes(img), w, h, w, threshold=255) == (3, 1, 10, 5)
-    assert pc.ink_bbox(bytes(img), w, h, w, threshold=50) == (3, 2, 4, 3)
+    assert margins.ink_bbox(bytes(img), w, h, w) == (3, 2, 8, 5)
+    assert margins.ink_bbox(bytes(img), w, h, w, threshold=255) == (3, 1, 10, 5)
+    assert margins.ink_bbox(bytes(img), w, h, w, threshold=50) == (3, 2, 4, 3)
     # row padding (stride > width) holds garbage that must be ignored
     stride = 12
     padded = bytearray()
     for row in range(h):
         padded += img[row * w:(row + 1) * w] + b"\x00\x00"
-    assert pc.ink_bbox(bytes(padded), w, h, stride) == (3, 2, 8, 5)
+    assert margins.ink_bbox(bytes(padded), w, h, stride) == (3, 2, 8, 5)
     # ink in the corners
     img = bytearray(blank)
     img[0] = img[-1] = 0
-    assert pc.ink_bbox(bytes(img), w, h, w) == (0, 0, w, h)
+    assert margins.ink_bbox(bytes(img), w, h, w) == (0, 0, w, h)
 
     # --- small helpers ---------------------------------------------------------
-    assert pc.cropped_name(Path("a/tavola.pdf")) == Path("a/tavola_cropped.pdf")
-    assert pc.cropped_name(Path("SCAN.PDF")).name == "SCAN_cropped.PDF"
-    assert pc.clamp_margin("2,5") == 2.5 and pc.clamp_margin("x") == pc.DEFAULT_MARGIN_MM
-    assert pc.clamp_margin(-3) == 0.0 and pc.clamp_margin(1e9) == pc.MAX_MARGIN_MM
-    assert pc.clamp_margin(float("nan")) == pc.DEFAULT_MARGIN_MM
+    assert margins.cropped_name(Path("a/tavola.pdf")) == Path("a/tavola_cropped.pdf")
+    assert margins.cropped_name(Path("SCAN.PDF")).name == "SCAN_cropped.PDF"
+    assert margins.clamp_margin("2,5") == 2.5 and margins.clamp_margin("x") == margins.DEFAULT_MARGIN_MM
+    assert margins.clamp_margin(-3) == 0.0 and margins.clamp_margin(1e9) == margins.MAX_MARGIN_MM
+    assert margins.clamp_margin(float("nan")) == margins.DEFAULT_MARGIN_MM
 
-    pc.load_engine()  # a clear failure here beats twenty confusing ones below
+    cropping.load_engine()  # a clear failure here beats twenty confusing ones below
 
     with tempfile.TemporaryDirectory() as td:
         td = Path(td)
@@ -141,46 +144,46 @@ def main() -> int:
         f = td / "plain.pdf"
         f.write_bytes(SAMPLE)
         seen = []
-        res = pc.crop_file(f, margin_mm=0, progress=seen.append)
+        res = cropping.crop_file(f, margin_mm=0, progress=seen.append)
         assert res.dest == td / "plain_cropped.pdf" and res.pages == 1 and res.cropped == 1
         media, crop, rot, n = boxes(res.dest)
         assert close_to(media, RECT_BOX) and close_to(crop, RECT_BOX), (media, crop)
         assert rot == 0 and n == 1
-        assert abs(res.width - 200 / pc.MM) < 1 and abs(res.height - 250 / pc.MM) < 1
-        assert pc.describe(res) == "71 × 88 mm"
+        assert abs(res.width - 200 / margins.MM) < 1 and abs(res.height - 250 / margins.MM) < 1
+        assert margins.describe(res) == "71 × 88 mm"
         # progress climbs monotonically to 1.0
         assert seen == sorted(seen) and seen[-1] == 1.0 and 0.0 < seen[0] <= 0.1
         # the original is untouched
         assert f.read_bytes() == SAMPLE
 
         # --- margin: grows the box, never past the page -------------------------
-        expect_raises(FileExistsError, pc.crop_file, f)
-        res = pc.crop_file(f, margin_mm=10, overwrite=True)
+        expect_raises(FileExistsError, cropping.crop_file, f)
+        res = cropping.crop_file(f, margin_mm=10, overwrite=True)
         media = boxes(res.dest)[0]
-        assert close_to(media, grown(RECT_BOX, 10 * pc.MM)), media
+        assert close_to(media, grown(RECT_BOX, 10 * margins.MM)), media
         edge = td / "edge.pdf"
         edge.write_bytes(make_pdf([{"box": A4, "rects": [(0, 300, 100, 100, 0)]}]))
-        media = boxes(pc.crop_file(edge, margin_mm=10).dest)[0]
-        assert media[0] == 0 and close_to(media, (0, 300 - 10 * pc.MM, 100 + 10 * pc.MM,
-                                                  400 + 10 * pc.MM)), media
+        media = boxes(cropping.crop_file(edge, margin_mm=10).dest)[0]
+        assert media[0] == 0 and close_to(media, (0, 300 - 10 * margins.MM, 100 + 10 * margins.MM,
+                                                  400 + 10 * margins.MM)), media
 
         # --- rotated pages: boxes stay in unrotated user space ------------------
         for angle in (90, 180, 270):
             r = td / f"rot{angle}.pdf"
             r.write_bytes(make_pdf([{"box": A4, "rotate": angle, "rects": [RECT + (0,)]}]))
-            res = pc.crop_file(r, margin_mm=0)
+            res = cropping.crop_file(r, margin_mm=0)
             media, crop, rot, _n = boxes(res.dest)
             assert close_to(media, RECT_BOX) and close_to(crop, RECT_BOX), (angle, media)
             assert rot == angle
             shown = (250, 200) if angle in (90, 270) else (200, 250)  # as displayed
-            assert abs(res.width - shown[0] / pc.MM) < 1, (angle, res)
-            assert abs(res.height - shown[1] / pc.MM) < 1, (angle, res)
+            assert abs(res.width - shown[0] / margins.MM) < 1, (angle, res)
+            assert abs(res.height - shown[1] / margins.MM) < 1, (angle, res)
 
         # --- page whose origin is not (0, 0), rotated on top ---------------------
         shifted = td / "shifted.pdf"
         shifted.write_bytes(make_pdf([{"box": (100, 200, 700, 1000), "rotate": 90,
                                        "rects": [(300, 400, 120, 60, 0)]}]))
-        media = boxes(pc.crop_file(shifted, margin_mm=0).dest)[0]
+        media = boxes(cropping.crop_file(shifted, margin_mm=0).dest)[0]
         assert close_to(media, (300, 400, 420, 460)), media
 
         # --- an existing CropBox limits what is looked at ------------------------
@@ -188,22 +191,22 @@ def main() -> int:
         precrop.write_bytes(make_pdf([{
             "box": A4, "crop": (100, 100, 500, 700),
             "rects": [RECT + (0,), (20, 20, 30, 30, 0)]}]))  # 2nd one is outside the CropBox
-        media = boxes(pc.crop_file(precrop, margin_mm=0).dest)[0]
+        media = boxes(cropping.crop_file(precrop, margin_mm=0).dest)[0]
         assert close_to(media, RECT_BOX), media
 
         # --- white paint is not ink ------------------------------------------------
         white = td / "white.pdf"
         white.write_bytes(make_pdf([{"box": A4, "rects": [(0, 0, 595, 842, 1), RECT + (0,)]}]))
-        media = boxes(pc.crop_file(white, margin_mm=0).dest)[0]
+        media = boxes(cropping.crop_file(white, margin_mm=0).dest)[0]
         assert close_to(media, RECT_BOX), media
 
         # --- light colours are (a CAD drawing's yellow lines must count) -----------
         light = td / "light.pdf"
         light.write_bytes(make_pdf([{"box": A4, "rects": [RECT + (0.9,)]}]))
-        media = boxes(pc.crop_file(light, margin_mm=0).dest)[0]
+        media = boxes(cropping.crop_file(light, margin_mm=0).dest)[0]
         assert close_to(media, RECT_BOX), media
         # ... unless the threshold says otherwise
-        expect_raises(pc.NothingToCrop, pc.crop_file, light, 0, True, 128)
+        expect_raises(margins.NothingToCrop, cropping.crop_file, light, 0, True, 128)
 
         # --- several pages: each one gets its own box, blank ones are left alone ----
         multi = td / "multi.pdf"
@@ -212,9 +215,9 @@ def main() -> int:
             {"box": A4},
             {"box": (0, 0, 842, 1191), "rotate": 270, "rects": [(400, 500, 50, 80, 0)]},
         ]))
-        res = pc.crop_file(multi, margin_mm=0)
+        res = cropping.crop_file(multi, margin_mm=0)
         assert res.pages == 3 and res.cropped == 2
-        assert pc.describe(res) == "2 of 3 pages"
+        assert margins.describe(res) == "2 of 3 pages"
         assert close_to(boxes(res.dest, 0)[0], RECT_BOX)
         assert close_to(boxes(res.dest, 1)[0], A4, 0.01)
         assert close_to(boxes(res.dest, 2)[0], (400, 500, 450, 580))
@@ -228,7 +231,7 @@ def main() -> int:
         squares = [(160 + 9 * k, 310, 166 + 9 * k, 316) for k in range(20)]
         notes.write_bytes(make_pdf([{"box": A4, "rects": [RECT + (0,)], "annots": squares}]))
         assert b"/AP" not in notes.read_bytes()
-        res = pc.crop_file(notes, margin_mm=0)
+        res = cropping.crop_file(notes, margin_mm=0)
         assert close_to(boxes(res.dest)[0], RECT_BOX)
         written = res.dest.read_bytes()
         assert b"/AP" not in written, "the saved document carries generated appearances"
@@ -238,22 +241,22 @@ def main() -> int:
         # --- nothing to do, nothing written ------------------------------------------
         full = td / "full.pdf"
         full.write_bytes(make_pdf([{"box": A4, "rects": [(0, 0, 595, 842, 0)]}]))
-        expect_raises(pc.NothingToCrop, pc.crop_file, full)
+        expect_raises(margins.NothingToCrop, cropping.crop_file, full)
         empty = td / "empty.pdf"
         empty.write_bytes(make_pdf([{"box": A4}]))
-        expect_raises(pc.NothingToCrop, pc.crop_file, empty)
-        assert not pc.cropped_name(full).exists() and not pc.cropped_name(empty).exists()
+        expect_raises(margins.NothingToCrop, cropping.crop_file, empty)
+        assert not margins.cropped_name(full).exists() and not margins.cropped_name(empty).exists()
 
         # --- not a PDF ------------------------------------------------------------------
         junk = td / "junk.pdf"
         junk.write_bytes(b"this is not a PDF at all\n" * 20)
-        expect_raises(pc.CropError, pc.crop_file, junk)
+        expect_raises(margins.CropError, cropping.crop_file, junk)
         assert not list(td.glob("*.part")), "temporary files left behind"
 
         # --- names with spaces, plus signs and accents (and the output is a valid PDF) --
         odd = td / "RC_ie06_ill.+fm_ piano terrà-RC_ie06.pdf"
         odd.write_bytes(SAMPLE)
-        res = pc.crop_file(odd)
+        res = cropping.crop_file(odd)
         assert res.dest.name == "RC_ie06_ill.+fm_ piano terrà-RC_ie06_cropped.pdf"
         assert res.dest.read_bytes().startswith(b"%PDF-")
 
@@ -262,47 +265,47 @@ def main() -> int:
         upper = td / "sub" / "UPPER.PDF"
         upper.write_bytes(SAMPLE)
         (td / "sub" / "notes.txt").write_text("x")
-        found = pc.iter_pdf([td])
+        found = cropping.iter_pdf([td])
         assert upper in found and f in found and multi in found
         assert not [x for x in found if x.stem.endswith("_cropped")]
         assert (td / "sub" / "notes.txt") not in found
         # a file named explicitly is taken as it is
-        assert pc.iter_pdf([res.dest]) == [res.dest]
+        assert cropping.iter_pdf([res.dest]) == [res.dest]
 
         # --- CLI ------------------------------------------------------------------------
         cli = td / "cli"
         cli.mkdir()
         (cli / "a.pdf").write_bytes(SAMPLE)
         (cli / "b.pdf").write_bytes(SAMPLE)
-        assert pc.run_cli([cli], False, 5.0, pc.DEFAULT_THRESHOLD) == 0
-        assert close_to(boxes(cli / "a_cropped.pdf")[0], grown(RECT_BOX, 5 * pc.MM))
+        assert command_line.run_cli([cli], False, 5.0, margins.DEFAULT_THRESHOLD) == 0
+        assert close_to(boxes(cli / "a_cropped.pdf")[0], grown(RECT_BOX, 5 * margins.MM))
         assert (cli / "b_cropped.pdf").is_file()
-        assert pc.run_cli([cli], False, 5.0, pc.DEFAULT_THRESHOLD) == 0   # all skipped
+        assert command_line.run_cli([cli], False, 5.0, margins.DEFAULT_THRESHOLD) == 0   # all skipped
         (cli / "bad.pdf").write_bytes(b"nope")
-        assert pc.run_cli([cli], True, 5.0, pc.DEFAULT_THRESHOLD) == 1    # one error
-        assert pc.run_cli([td / "missing"], False, 5.0, pc.DEFAULT_THRESHOLD) == 1
+        assert command_line.run_cli([cli], True, 5.0, margins.DEFAULT_THRESHOLD) == 1    # one error
+        assert command_line.run_cli([td / "missing"], False, 5.0, margins.DEFAULT_THRESHOLD) == 1
 
     # --- update check helpers (no network) ---------------------------------
-    assert pc.parse_version("v1.10.2") == (1, 10, 2)
-    assert pc.parse_version("2") == (2,)
-    assert pc.is_newer("1.2.1", "1.2.0") and not pc.is_newer("1.2.0", "1.2.0")
-    assert pc.is_newer("v2", "1.9.9") and not pc.is_newer("1.2", "1.2.0")
+    assert updates.parse_version("v1.10.2") == (1, 10, 2)
+    assert updates.parse_version("2") == (2,)
+    assert updates.is_newer("1.2.1", "1.2.0") and not updates.is_newer("1.2.0", "1.2.0")
+    assert updates.is_newer("v2", "1.9.9") and not updates.is_newer("1.2", "1.2.0")
     def asset(name, **changes):
-        return {"name": name, "url": pc.DOWNLOADS_URL + "v1.3.0/" + name, "size": 9000, "sha256": "ab", "signature_url": pc.DOWNLOADS_URL + "v1.3.0/" + name + ".minisig",
+        return {"name": name, "url": pdf_cropper.DOWNLOADS_URL + "v1.3.0/" + name, "size": 9000, "sha256": "ab", "signature_url": pdf_cropper.DOWNLOADS_URL + "v1.3.0/" + name + ".minisig",
                 **changes}
     assets = [asset("pdf-cropper-v1.3.0-windows-x64-portable.zip"),
               asset("pdf-cropper-setup-v1.3.0-windows-x64.exe"),
               asset("pdf-cropper-v1.3.0-linux-x64-portable.tar.gz")]
-    assert pc.pick_asset(assets, installed=True)["name"].endswith(".exe")
-    assert pc.pick_asset(assets, installed=False)["name"].endswith(".zip")
-    assert pc.pick_asset([], installed=True) is None
+    assert updates.pick_asset(assets, installed=True)["name"].endswith(".exe")
+    assert updates.pick_asset(assets, installed=False)["name"].endswith(".zip")
+    assert updates.pick_asset([], installed=True) is None
     # the installer, which is run: a released one, from this project, with its checksum
     setup = "pdf-cropper-setup-v1.3.0-windows-x64.exe"
-    assert pc.pick_asset([asset(setup, sha256="")], installed=True) is None
-    assert pc.pick_asset([asset(setup, url="https://example.com/" + setup)], installed=True) is None
-    assert pc.pick_asset([asset("pdf-cropper-setup-vdev-windows-x64.exe")], installed=True) is None
-    assert pc.pick_asset([asset(setup, signature_url="")], installed=True) is None          # not signed
-    assert pc.pick_asset([asset(setup, signature_url="https://example.com/s.minisig")], installed=True) is None
+    assert updates.pick_asset([asset(setup, sha256="")], installed=True) is None
+    assert updates.pick_asset([asset(setup, url="https://example.com/" + setup)], installed=True) is None
+    assert updates.pick_asset([asset("pdf-cropper-setup-vdev-windows-x64.exe")], installed=True) is None
+    assert updates.pick_asset([asset(setup, signature_url="")], installed=True) is None          # not signed
+    assert updates.pick_asset([asset(setup, signature_url="https://example.com/s.minisig")], installed=True) is None
     # the releases' minisign signature: Ed25519 against RFC 8032's vectors
     import hashlib
     for public, message, signature in (
@@ -313,8 +316,8 @@ def main() -> int:
              "92a009a9f0d4cab8720e820b5f642540a2b27b5416503f8fb3762223ebdb69da085ac1e43e15996e458f3613d0f11d8c387b2eae"
              "b4302aeeb00d291612bb0c00")):
         public, message, signature = bytes.fromhex(public), bytes.fromhex(message), bytes.fromhex(signature)
-        assert pc.ed25519_verify(public, message, signature)
-        assert not pc.ed25519_verify(public, message + b"x", signature)
+        assert minisign.ed25519_verify(public, message, signature)
+        assert not minisign.ed25519_verify(public, message + b"x", signature)
     # signatures made by minisign 0.12 with a key of the tests' own
     test_key = "RWR7SJiRpYyOYfMs5NsaotSrG3B4wGxiTvXOWkzu4JCT3e240QSuHElq"
     signed_got = ("untrusted comment: signature from minisign secret key\n"
@@ -326,17 +329,17 @@ def main() -> int:
                     "trusted comment: timestamp:1792398099 file:other.exe hashed\n"
                     "L5a1c0bubqCfk4+ZchcJRRg8+Bi2WpL63yOy2uQk4amVYDJdN/fSCGPcny6gaY+7CpQmwcUAk8p4JXkFjaiUCQ==\n")
     payload_digest = hashlib.blake2b(b"installer" * 1000, digest_size=64).digest()
-    assert pc.minisign_verify(payload_digest, signed_got, test_key) == "timestamp:1792398099 file:got.exe hashed"
-    expect_raises(ValueError, pc.minisign_verify, hashlib.blake2b(b"other", digest_size=64).digest(), signed_got,
+    assert minisign.minisign_verify(payload_digest, signed_got, test_key) == "timestamp:1792398099 file:got.exe hashed"
+    expect_raises(ValueError, minisign.minisign_verify, hashlib.blake2b(b"other", digest_size=64).digest(), signed_got,
                   test_key)
-    expect_raises(ValueError, pc.minisign_verify, payload_digest, signed_got, pc.UPDATE_PUBLIC_KEY)    # another key
+    expect_raises(ValueError, minisign.minisign_verify, payload_digest, signed_got, updates.UPDATE_PUBLIC_KEY)    # another key
     forged = signed_got.split("\n")
     forged[2] = signed_other.split("\n")[2]                    # another file's name, the comment's signature kept
-    expect_raises(ValueError, pc.minisign_verify, payload_digest, "\n".join(forged), test_key)
-    expect_raises(ValueError, pc.minisign_verify, payload_digest, "Not Found", test_key)
+    expect_raises(ValueError, minisign.minisign_verify, payload_digest, "\n".join(forged), test_key)
+    expect_raises(ValueError, minisign.minisign_verify, payload_digest, "Not Found", test_key)
     # downloaded: checked against its size, its checksum and its signature (for
     # this very file, by this project's key), or refused
-    real_key, pc.UPDATE_PUBLIC_KEY = pc.UPDATE_PUBLIC_KEY, test_key
+    real_key, updates.UPDATE_PUBLIC_KEY = updates.UPDATE_PUBLIC_KEY, test_key
     try:
         with tempfile.TemporaryDirectory() as td:
             source = Path(td) / "setup.exe"
@@ -345,7 +348,7 @@ def main() -> int:
             for name, text in (("got.minisig", signed_got), ("other.minisig", signed_other)):
                 (Path(td) / name).write_text(text, encoding="utf-8")
             signature = (Path(td) / "got.minisig").as_uri()
-            got = pc.download_file(source.as_uri(), Path(td) / "got.exe", sha256=good, size=9000,
+            got = updates.download_file(source.as_uri(), Path(td) / "got.exe", sha256=good, size=9000,
                                    signature_url=signature)
             assert got.read_bytes() == source.read_bytes()
             got.unlink()
@@ -355,41 +358,41 @@ def main() -> int:
                                   ("got.exe", {"signature_url": source.as_uri()}),
                                   ("other-name.exe", {})):
                 kw = {"sha256": good, "size": 9000, "signature_url": signature, **changes}
-                expect_raises(pc.UpdateError, pc.download_file, source.as_uri(), Path(td) / dest, **kw)
+                expect_raises(updates.UpdateError, updates.download_file, source.as_uri(), Path(td) / dest, **kw)
                 assert not (Path(td) / dest).exists() and not (Path(td) / (dest + ".part")).exists()
-            pc.UPDATE_PUBLIC_KEY = real_key                   # the project's own: not the one that signed it
-            expect_raises(pc.UpdateError, pc.download_file, source.as_uri(), Path(td) / "got.exe",
+            updates.UPDATE_PUBLIC_KEY = real_key                   # the project's own: not the one that signed it
+            expect_raises(updates.UpdateError, updates.download_file, source.as_uri(), Path(td) / "got.exe",
                           sha256=good, size=9000, signature_url=signature)
     finally:
-        pc.UPDATE_PUBLIC_KEY = real_key
+        updates.UPDATE_PUBLIC_KEY = real_key
     # the release workflow checks its signatures with the key the code trusts
     workflow = (Path(__file__).resolve().parent.parent / ".github" / "workflows" / "build.yml")
-    assert f"PUBLIC_KEY: {pc.UPDATE_PUBLIC_KEY}\n" in workflow.read_text(encoding="utf-8")
+    assert f"PUBLIC_KEY: {updates.UPDATE_PUBLIC_KEY}\n" in workflow.read_text(encoding="utf-8")
 
     # --- preferences round-trip ----------------------------------------------
     with tempfile.TemporaryDirectory() as td:
         ini = Path(td) / "cfg" / "settings.ini"
-        s = pc.Settings(ini)
+        s = settings.Settings(ini)
         assert s.get_bool("check_updates") and s.get("last_update_check") == ""
-        assert pc.clamp_margin(s.get("margin_mm")) == pc.DEFAULT_MARGIN_MM
+        assert margins.clamp_margin(s.get("margin_mm")) == margins.DEFAULT_MARGIN_MM
         s.set("check_updates", False)
         s.set("margin_mm", "7.5")
-        again = pc.Settings(ini)
+        again = settings.Settings(ini)
         assert not again.get_bool("check_updates")
-        assert pc.clamp_margin(again.get("margin_mm")) == 7.5
+        assert margins.clamp_margin(again.get("margin_mm")) == 7.5
         assert again.get_bool("system_title_bar")  # untouched default survives
 
     # --- command line -----------------------------------------------------------
     # as re-parsed by the primary GUI instance
-    ns, unknown = pc.build_parser().parse_known_args(["--gui", "a.pdf", "--future-flag"])
+    ns, unknown = command_line.build_parser().parse_known_args(["--gui", "a.pdf", "--future-flag"])
     assert ns.gui and ns.paths == ["a.pdf"] and unknown == ["--future-flag"]
-    ns = pc.build_parser().parse_args(["--margin", "3,5", "--threshold", "200", "x.pdf"])
+    ns = command_line.build_parser().parse_args(["--margin", "3,5", "--threshold", "200", "x.pdf"])
     assert ns.margin == 3.5 and ns.threshold == 200
     import contextlib
     import io
     for bad in (["--margin", "-1"], ["--margin", "abc"], ["--threshold", "0"]):
         with contextlib.redirect_stderr(io.StringIO()):
-            expect_raises(SystemExit, pc.build_parser().parse_args, bad)
+            expect_raises(SystemExit, command_line.build_parser().parse_args, bad)
 
     # --- translations: po -> mo compiler and gettext plumbing ----------------
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
@@ -399,7 +402,7 @@ def main() -> int:
         written = compile_po.compile_all(root / "po", Path(td))
         assert [lang for lang, _count, _out in written] == ["it"]
         import gettext
-        it = gettext.translation(pc.TEXTDOMAIN, td, languages=["it"])
+        it = gettext.translation(pdf_cropper.TEXTDOMAIN, td, languages=["it"])
         assert it.gettext("Queued") == "In coda"
         assert it.gettext("Cropping… {percent}%") == "Ritaglio in corso… {percent}%"
         assert it.gettext("not a translated string") == "not a translated string"
@@ -407,7 +410,8 @@ def main() -> int:
     # translatable string of the source must be in the catalogue (adjacent
     # string literals split over lines are joined first)
     import re
-    source = re.sub(r'"\s*\n\s*"', "", (root / "pdf_cropper.py").read_text(encoding="utf-8"))
+    source = re.sub(r'"\s*\n\s*"', "", "\n".join(p.read_text(encoding="utf-8")
+                                                    for p in sorted((root / "src" / "pdf_cropper").rglob("*.py"))))
     entries = compile_po.parse_po(root / "po" / "it.po")
     missing = [m for m in entries if m and m not in source]
     assert not missing, f"msgids not found in the source: {missing[:5]}"
@@ -419,7 +423,7 @@ def main() -> int:
     for msgid, msgstr in entries.items():
         if msgid:
             assert sorted(re.findall(r"\{\w+\}", msgid)) == sorted(re.findall(r"\{\w+\}", msgstr)), msgid
-    assert pc.detect_language() in pc.LANGUAGES
+    assert i18n.detect_language() in i18n.LANGUAGES
 
     # --- icons: gdk-pixbuf must be able to sniff them ------------------------
     # It only looks for the <svg> element in the first 256 bytes; past that the

@@ -69,7 +69,7 @@ sudo apt install python3-gi gir1.2-gtk-4.0 gir1.2-adw-1
                          sudo dnf install python3-gobject gtk4 libadwaita
                                                            sudo pacman -S python-gobject gtk4 libadwaita
 pip install -r requirements.txt   # pypdfium2
-python3 pdf_cropper.py
+python3 bin/pdf-cropper
 ```
 
 On Windows, use a release build. The command line needs nothing but
@@ -212,8 +212,17 @@ output directory `site`).
 
 ## Development
 
+The code is the package `src/pdf_cropper/`, in four layers with the imports
+going one way only: `core/` (the box around the ink, the margin, the names:
+values in, values out), `data/` (the page boxes of the PDF), `app/` (a file
+cropped with the PDF engine, settings, updates, the Windows registry; no
+toolkit) and `gui/` (the GTK window, the only place `gi` is imported). `gui`
+uses `app`, `app` uses `core` and `data`, `core` and `data` know nobody.
+`tests/test_strati.py` reads the imports and fails with file, line and rule.
+
 ```bash
 python tests/test_crop.py        # self-contained test suite (needs pypdfium2)
+python tests/test_strati.py      # the layers: every import goes one way
 python tools/compile_po.py       # compile po/*.po into locale/ (needed to see translations)
 python tools/make_icon.py        # regenerate assets/icon.*, data/icons PNGs, installer bitmaps (Pillow)
 desktop-file-validate data/io.github.daniel_g_carrasco.pdf-cropper.desktop
@@ -225,7 +234,7 @@ MSYS2 on Windows; installer compiled with Inno Setup; Flatpak via
 flatpak-builder). Besides the test suite, CI starts the bundled GUI on
 Windows and under Xvfb on Linux and checks that a file handed to it really
 gets cropped. Tagging `v*` publishes a release; the tag must match
-`__version__` in `pdf_cropper.py`, and the release should be listed in the
+`__version__` in `src/pdf_cropper/__init__.py`, and the release should be listed in the
 metainfo. The pypdfium2 version is pinned in the workflow
 (`PYPDFIUM2_VERSION`) and in the Flatpak manifest (wheel URLs and checksums):
 change both together.
@@ -235,7 +244,7 @@ Windows and `$XDG_CONFIG_HOME/pdf-cropper/settings.ini` on Linux.
 
 Translations live in `po/` (English source strings in the code, one `.po`
 per language). To refresh the template after changing strings:
-`xgettext --from-code=UTF-8 --keyword=_ -o po/pdf-cropper.pot pdf_cropper.py`,
+`xgettext --from-code=UTF-8 --keyword=_ -o po/pdf-cropper.pot $(find src -name '*.py' | sort)`,
 then merge with `msgmerge -U po/it.po po/pdf-cropper.pot`. The test suite
 fails when a string of the source is missing from the catalogue.
 Set `PDF_CROPPER_STARTUP_LOG=<file>` to get start-up timestamps appended to a

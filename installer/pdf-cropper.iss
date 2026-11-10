@@ -2,7 +2,7 @@
 ; Compiled by CI with:  ISCC.exe /DAppVersion=X.Y.Z installer\pdf-cropper.iss
 ; Expects the PyInstaller output in dist\pdf-cropper (repo root).
 ;
-; The registry layout below mirrors win_register() in pdf_cropper.py
+; The registry layout below mirrors win_register() in src/pdf_cropper/app/windows_shell.py
 ; (verb PDFCropper.crop): keep them in sync.
 ; Every user-visible string lives in [CustomMessages], once per language.
 

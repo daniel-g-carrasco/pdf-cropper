@@ -17,7 +17,7 @@ ICON = 'assets/icon.ico' if WIN else None
 # official win_amd64 wheel into the environment: CI unpacks it into vendor/
 # instead (see .github/workflows/build.yml).
 VENDOR = os.path.join(SPECPATH, 'vendor')
-pathex = []
+pathex = [os.path.join(SPECPATH, 'src')]       # the package
 if os.path.isdir(VENDOR):
     sys.path.insert(0, VENDOR)
     pathex.append(VENDOR)
@@ -79,7 +79,7 @@ if WIN:
 GI_VERSIONS = {'Gtk': '4.0', 'Gdk': '4.0', 'Adw': '1'}
 
 a = Analysis(
-    ['pdf_cropper.py'],
+    [os.path.join(SPECPATH, 'build-aux', 'windows', 'pdf_cropper_main.py')],
     pathex=pathex,
     binaries=binaries,
     datas=datas,
