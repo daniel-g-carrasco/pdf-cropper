@@ -21,8 +21,10 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install "pypdfium2==${PYPDFIUM2_VERSION}"
-      - run: python tests/test_crop.py
-      - run: python tests/test_strati.py
+      - run: python tools/compile_po.py
+      # the whole suite (test_crop.py, the layers, the shared modules' tests,
+      # the fingerprints of the copies) in the model's runner
+      - run: python tools/run_tests.py tests
       - name: Validate desktop entry and AppStream metadata
         run: |
           sudo apt-get update
@@ -69,7 +71,9 @@ jobs:
             --only-binary=:all: --no-deps "pypdfium2==${PYPDFIUM2_VERSION}"
           test -f vendor/pypdfium2_raw/pdfium.dll
       - name: Test suite under the MSYS2 Python
-        run: PYTHONPATH=vendor python tests/test_crop.py
+        run: |
+          python tools/compile_po.py
+          PYTHONPATH=vendor python tools/run_tests.py tests
       - name: Build with PyInstaller
         run: |
           python tools/compile_po.py
@@ -86,6 +90,9 @@ jobs:
           test -f "$I/certs/ca-bundle.crt" # TLS for the update check
           test -f "$I/share/icons/hicolor/scalable/apps/io.github.daniel_g_carrasco.pdf-cropper.svg"
           test -f "$I/share/locale/it/LC_MESSAGES/pdf-cropper.mo"
+          test -f "$I/licenses/LICENSE"             # the program's GPL-3.0-or-later
+          test -f "$I/licenses/jbigkit/COPYING"     # libjbig (GPL-2.0)
+          test -f "$I/licenses/lzo2/LICENSE"        # liblzo2 (GPL-2.0)
       - name: Ensure GLib schemas and icon themes are bundled
         run: |
           APPDIR=dist/pdf-cropper/_internal
@@ -207,6 +214,7 @@ jobs:
           ls dist/pdf-cropper/_internal/libadwaita-1*.so*
           ls dist/pdf-cropper/_internal/pypdfium2_raw/libpdfium*.so*
           test -f dist/pdf-cropper/_internal/share/locale/it/LC_MESSAGES/pdf-cropper.mo
+          test -f dist/pdf-cropper/_internal/licenses/LICENSE
       - name: Slim the bundle (locales and icon variants the app never loads)
         run: |
           I=dist/pdf-cropper/_internal

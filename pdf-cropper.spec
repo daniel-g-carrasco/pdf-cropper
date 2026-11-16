@@ -27,6 +27,10 @@ if os.path.isdir(VENDOR):
 datas = [('data/icons', 'share/icons')]
 binaries = []
 
+# The program's own licence (GPL-3.0-or-later) goes with every build, in
+# _internal/licenses: the installer, the portable zip and the tar.gz.
+datas.append((os.path.join(SPECPATH, 'LICENSE'), 'licenses'))
+
 # PDFium itself, the version files pypdfium2 reads at import time, and its
 # licence texts (dist-info).
 binaries += collect_dynamic_libs('pypdfium2_raw')
@@ -73,6 +77,16 @@ if WIN:
             break
     else:
         print('WARNING: no CA bundle found: the update check may fail on TLS')
+
+    # Two GPL-2.0 libraries come in with GTK's own dependencies: JBIG-KIT
+    # (libjbig-0.dll, through libtiff) and LZO (liblzo2-2.dll, through
+    # cairo). Their licence texts, as MSYS2 installs them, go with the build.
+    for package, text in (('jbigkit', 'COPYING'), ('lzo2', 'LICENSE')):
+        source = prefix / 'share' / 'licenses' / package / text
+        if source.is_file():
+            datas.append((str(source), f'licenses/{package}'))
+        else:
+            print(f'WARNING: {source} missing: the {package} licence is not bundled')
 
 # Introspection modules the gi hook must collect: a libadwaita app on both
 # systems (on Windows inside a window with the system title bar).

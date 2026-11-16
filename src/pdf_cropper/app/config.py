@@ -3,22 +3,20 @@
 from __future__ import annotations
 
 import configparser
-import os
-import sys
+import io
 from pathlib import Path
 
 from pdf_cropper.core.margins import DEFAULT_MARGIN_MM
+from pdf_cropper.data import atomic
+
+from . import log, services
 
 
 def config_dir() -> Path:
-    """Per-user configuration directory, following platform conventions:
-    $XDG_CONFIG_HOME on Linux (Flatpak points it inside the sandbox),
-    %LOCALAPPDATA% on Windows."""
-    if sys.platform == "win32":
-        base = os.environ.get("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local")
-    else:
-        base = os.environ.get("XDG_CONFIG_HOME") or str(Path.home() / ".config")
-    return Path(base) / "pdf-cropper"
+    """Per-user configuration directory (app/services.py): %LOCALAPPDATA%
+    on Windows, $XDG_CONFIG_HOME on Linux (the Flatpak points it inside
+    the sandbox)."""
+    return services.app_paths().config
 
 
 class Settings:
@@ -30,8 +28,8 @@ class Settings:
         # Windows: the system title bar (and so Snap) rather than GTK's
         "system_title_bar": "true",
         "margin_mm": str(DEFAULT_MARGIN_MM),  # white border left around the content
-        "check_updates": "true",       # Windows: look for a new release daily
-        "last_update_check": "",       # ISO date of the last automatic check
+        "check_updates": "true",       # Windows: look for a new release, every 4 hours at most
+        "last_update_check": "",       # when the last automatic check was made (updates.check_stamp)
     }
 
     def __init__(self, path: Path | None = None):
@@ -56,9 +54,29 @@ class Settings:
         self.save()
 
     def save(self) -> None:
+        """The file written whole or not at all (data/atomic.py: a temporary
+        file renamed over it, the rename tried again for a moment when
+        Windows refuses it, an antivirus or the indexer holding the file
+        just written). A failure is said on stderr (errors.log), never fatal:
+        the preferences are a convenience."""
+        text = io.StringIO()
+        self._cp.write(text)
         try:
-            self.path.parent.mkdir(parents=True, exist_ok=True)
-            with open(self.path, "w", encoding="utf-8") as f:
-                self._cp.write(f)
-        except OSError:
-            pass  # preferences are a convenience, never fatal
+            atomic.write_bytes(self.path, text.getvalue().encode("utf-8"))
+        except OSError as error:
+            log.complain("saving the preferences", error)
+
+    # what the troubleshooting text of the About window says (app/diagnostics.py)
+    notices = ()
+
+    @property
+    def theme(self) -> str:
+        return self.get("color_scheme")
+
+    @property
+    def language(self) -> str:
+        return self.get("language")
+
+    @property
+    def check_updates(self) -> bool:
+        return self.get_bool("check_updates")

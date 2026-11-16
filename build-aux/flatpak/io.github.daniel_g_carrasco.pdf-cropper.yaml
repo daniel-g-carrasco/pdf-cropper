@@ -51,6 +51,7 @@ modules:
       - cp -r src/pdf_cropper /app/share/pdf-cropper/pdf_cropper
       - install -Dm755 bin/pdf-cropper /app/bin/pdf-cropper
       - python3 tools/compile_po.py --dest /app/share/locale
+      - install -Dm644 LICENSE -t /app/share/licenses/io.github.daniel_g_carrasco.pdf-cropper
       - install -Dm644 data/io.github.daniel_g_carrasco.pdf-cropper.desktop -t /app/share/applications
       - install -Dm644 data/io.github.daniel_g_carrasco.pdf-cropper.metainfo.xml -t /app/share/metainfo
       - install -Dm644 data/icons/hicolor/scalable/apps/io.github.daniel_g_carrasco.pdf-cropper.svg -t /app/share/icons/hicolor/scalable/apps

@@ -6,11 +6,12 @@ from __future__ import annotations
 
 import argparse
 import sys
+import urllib.error
 from pathlib import Path
 
 from pdf_cropper import __version__
+from pdf_cropper.app import services, updates
 from pdf_cropper.app.crop import crop_file, iter_pdf, load_engine
-from pdf_cropper.app.updates import UpdateError, fetch_latest_release, is_newer
 from pdf_cropper.core.margins import (
     CropError,
     DEFAULT_MARGIN_MM,
@@ -28,15 +29,24 @@ def run_check_update() -> int:
     (up to date or not), 3 when the network/TLS layer failed."""
     print(_("Installed version: {version}").format(version=__version__))
     try:
-        rel = fetch_latest_release()
-    except UpdateError as e:
+        release = updates.latest_release(services.project())
+    except updates.UpdateError as e:
         print(_("Update check failed: {error}").format(error=e), file=sys.stderr)
-        return 0 if e.reached else 3
-    if is_newer(rel["version"]):
-        print(_("Available: {version}  ({url})").format(version=rel["version"], url=rel["url"]))
+        return 0 if reached(e) else 3
+    if updates.is_newer(release.version, __version__):
+        print(_("Available: {version}  ({url})").format(version=release.version, url=release.url))
     else:
-        print(_("Latest version: {version} (up to date)").format(version=rel["version"]))
+        print(_("Latest version: {version} (up to date)").format(version=release.version))
     return 0
+
+
+def reached(error: Exception) -> bool:
+    """Whether GitHub answered (with an error or an answer that will not
+    do), rather than the network or TLS failing before it could: the
+    shared updates.py raises its UpdateError from the error that caused it,
+    which stays its __context__."""
+    cause = error.__context__
+    return isinstance(cause, urllib.error.HTTPError) or not isinstance(cause, OSError)
 
 
 # ---------------------------------------------------------------------------

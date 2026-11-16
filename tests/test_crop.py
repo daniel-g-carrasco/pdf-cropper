@@ -2,20 +2,28 @@
 """Standalone tests for the PDF cropping core (needs pypdfium2, nothing else).
 
 Run:  python tests/test_crop.py
+      (or with the whole suite: python tools/run_tests.py tests, where it is
+      one test case; it does not import _setup, so that it still runs by
+      itself in the Flatpak's build)
 Also used by CI to generate a smoke-test sample:
       python tests/test_crop.py --make-sample out.pdf
       python tests/test_crop.py --check-sample out_cropped.pdf
+The updates and the signatures are tested by the shared tests
+(test_updates.py, test_minisign.py) and test_updates_pdf_cropper.py.
 """
 
+import contextlib
+import io
 import sys
 import tempfile
+import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 import pdf_cropper  # noqa: E402
-from pdf_cropper import cli as command_line, i18n  # noqa: E402
-from pdf_cropper.app import crop as cropping, minisign, settings, updates  # noqa: E402
+from pdf_cropper import cli as command_line  # noqa: E402
+from pdf_cropper.app import config, crop as cropping  # noqa: E402
 from pdf_cropper.core import margins  # noqa: E402
 
 # --- tiny PDF builder -------------------------------------------------------
@@ -105,7 +113,18 @@ def main() -> int:
         assert close_to(media, grown(RECT_BOX, margins.DEFAULT_MARGIN_MM * margins.MM)), media
         print(f"sample cropped as expected: {[round(v, 1) for v in media]}")
         return 0
+    return run_all()
 
+
+class CropTests(unittest.TestCase):
+    """The whole script as one case of the suite (tools/run_tests.py)."""
+
+    def test_everything(self):
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(run_all(), 0)
+
+
+def run_all() -> int:
     # --- ink bounding box on raw greyscale buffers ---------------------------
     w, h = 10, 6
     blank = bytearray(b"\xff" * (w * h))
@@ -285,99 +304,15 @@ def main() -> int:
         assert command_line.run_cli([cli], True, 5.0, margins.DEFAULT_THRESHOLD) == 1    # one error
         assert command_line.run_cli([td / "missing"], False, 5.0, margins.DEFAULT_THRESHOLD) == 1
 
-    # --- update check helpers (no network) ---------------------------------
-    assert updates.parse_version("v1.10.2") == (1, 10, 2)
-    assert updates.parse_version("2") == (2,)
-    assert updates.is_newer("1.2.1", "1.2.0") and not updates.is_newer("1.2.0", "1.2.0")
-    assert updates.is_newer("v2", "1.9.9") and not updates.is_newer("1.2", "1.2.0")
-    def asset(name, **changes):
-        return {"name": name, "url": pdf_cropper.DOWNLOADS_URL + "v1.3.0/" + name, "size": 9000, "sha256": "ab", "signature_url": pdf_cropper.DOWNLOADS_URL + "v1.3.0/" + name + ".minisig",
-                **changes}
-    assets = [asset("pdf-cropper-v1.3.0-windows-x64-portable.zip"),
-              asset("pdf-cropper-setup-v1.3.0-windows-x64.exe"),
-              asset("pdf-cropper-v1.3.0-linux-x64-portable.tar.gz")]
-    assert updates.pick_asset(assets, installed=True)["name"].endswith(".exe")
-    assert updates.pick_asset(assets, installed=False)["name"].endswith(".zip")
-    assert updates.pick_asset([], installed=True) is None
-    # the installer, which is run: a released one, from this project, with its checksum
-    setup = "pdf-cropper-setup-v1.3.0-windows-x64.exe"
-    assert updates.pick_asset([asset(setup, sha256="")], installed=True) is None
-    assert updates.pick_asset([asset(setup, url="https://example.com/" + setup)], installed=True) is None
-    assert updates.pick_asset([asset("pdf-cropper-setup-vdev-windows-x64.exe")], installed=True) is None
-    assert updates.pick_asset([asset(setup, signature_url="")], installed=True) is None          # not signed
-    assert updates.pick_asset([asset(setup, signature_url="https://example.com/s.minisig")], installed=True) is None
-    # the releases' minisign signature: Ed25519 against RFC 8032's vectors
-    import hashlib
-    for public, message, signature in (
-            ("d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a", "",
-             "e5564300c360ac729086e2cc806e828a84877f1eb8e5d974d873e065224901555fb8821590a33bacc61e39701cf9b46bd25bf5f0"
-             "595bbe24655141438e7a100b"),
-            ("3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c", "72",
-             "92a009a9f0d4cab8720e820b5f642540a2b27b5416503f8fb3762223ebdb69da085ac1e43e15996e458f3613d0f11d8c387b2eae"
-             "b4302aeeb00d291612bb0c00")):
-        public, message, signature = bytes.fromhex(public), bytes.fromhex(message), bytes.fromhex(signature)
-        assert minisign.ed25519_verify(public, message, signature)
-        assert not minisign.ed25519_verify(public, message + b"x", signature)
-    # signatures made by minisign 0.12 with a key of the tests' own
-    test_key = "RWR7SJiRpYyOYfMs5NsaotSrG3B4wGxiTvXOWkzu4JCT3e240QSuHElq"
-    signed_got = ("untrusted comment: signature from minisign secret key\n"
-                  "RUR7SJiRpYyOYTjY8y9f5xQs4K0f1/VnY5nfhx92xYh0ROEhmhIgOa2L0LoAiY/j94qPDaF0/iYheQNA+394mJGnMBXICA7BTA0=\n"
-                  "trusted comment: timestamp:1792398099 file:got.exe hashed\n"
-                  "Gtpw0wyHprPmsRcw2ZaorVtJ+O+y6651HZVjYbozGL5/lr5siMpSBJrS9iR9NPllyCf/VMUL7SeG0SDNh4ezBA==\n")
-    signed_other = ("untrusted comment: signature from minisign secret key\n"
-                    "RUR7SJiRpYyOYTjY8y9f5xQs4K0f1/VnY5nfhx92xYh0ROEhmhIgOa2L0LoAiY/j94qPDaF0/iYheQNA+394mJGnMBXICA7BTA0=\n"
-                    "trusted comment: timestamp:1792398099 file:other.exe hashed\n"
-                    "L5a1c0bubqCfk4+ZchcJRRg8+Bi2WpL63yOy2uQk4amVYDJdN/fSCGPcny6gaY+7CpQmwcUAk8p4JXkFjaiUCQ==\n")
-    payload_digest = hashlib.blake2b(b"installer" * 1000, digest_size=64).digest()
-    assert minisign.minisign_verify(payload_digest, signed_got, test_key) == "timestamp:1792398099 file:got.exe hashed"
-    expect_raises(ValueError, minisign.minisign_verify, hashlib.blake2b(b"other", digest_size=64).digest(), signed_got,
-                  test_key)
-    expect_raises(ValueError, minisign.minisign_verify, payload_digest, signed_got, updates.UPDATE_PUBLIC_KEY)    # another key
-    forged = signed_got.split("\n")
-    forged[2] = signed_other.split("\n")[2]                    # another file's name, the comment's signature kept
-    expect_raises(ValueError, minisign.minisign_verify, payload_digest, "\n".join(forged), test_key)
-    expect_raises(ValueError, minisign.minisign_verify, payload_digest, "Not Found", test_key)
-    # downloaded: checked against its size, its checksum and its signature (for
-    # this very file, by this project's key), or refused
-    real_key, updates.UPDATE_PUBLIC_KEY = updates.UPDATE_PUBLIC_KEY, test_key
-    try:
-        with tempfile.TemporaryDirectory() as td:
-            source = Path(td) / "setup.exe"
-            source.write_bytes(b"installer" * 1000)
-            good = hashlib.sha256(source.read_bytes()).hexdigest()
-            for name, text in (("got.minisig", signed_got), ("other.minisig", signed_other)):
-                (Path(td) / name).write_text(text, encoding="utf-8")
-            signature = (Path(td) / "got.minisig").as_uri()
-            got = updates.download_file(source.as_uri(), Path(td) / "got.exe", sha256=good, size=9000,
-                                   signature_url=signature)
-            assert got.read_bytes() == source.read_bytes()
-            got.unlink()
-            for dest, changes in (("got.exe", {"sha256": "0" * 64}), ("got.exe", {"size": 9010}),
-                                  ("got.exe", {"sha256": ""}), ("got.exe", {"signature_url": ""}),
-                                  ("got.exe", {"signature_url": (Path(td) / "other.minisig").as_uri()}),
-                                  ("got.exe", {"signature_url": source.as_uri()}),
-                                  ("other-name.exe", {})):
-                kw = {"sha256": good, "size": 9000, "signature_url": signature, **changes}
-                expect_raises(updates.UpdateError, updates.download_file, source.as_uri(), Path(td) / dest, **kw)
-                assert not (Path(td) / dest).exists() and not (Path(td) / (dest + ".part")).exists()
-            updates.UPDATE_PUBLIC_KEY = real_key                   # the project's own: not the one that signed it
-            expect_raises(updates.UpdateError, updates.download_file, source.as_uri(), Path(td) / "got.exe",
-                          sha256=good, size=9000, signature_url=signature)
-    finally:
-        updates.UPDATE_PUBLIC_KEY = real_key
-    # the release workflow checks its signatures with the key the code trusts
-    workflow = (Path(__file__).resolve().parent.parent / ".github" / "workflows" / "build.yml")
-    assert f"PUBLIC_KEY: {updates.UPDATE_PUBLIC_KEY}\n" in workflow.read_text(encoding="utf-8")
-
     # --- preferences round-trip ----------------------------------------------
     with tempfile.TemporaryDirectory() as td:
         ini = Path(td) / "cfg" / "settings.ini"
-        s = settings.Settings(ini)
+        s = config.Settings(ini)
         assert s.get_bool("check_updates") and s.get("last_update_check") == ""
         assert margins.clamp_margin(s.get("margin_mm")) == margins.DEFAULT_MARGIN_MM
         s.set("check_updates", False)
         s.set("margin_mm", "7.5")
-        again = settings.Settings(ini)
+        again = config.Settings(ini)
         assert not again.get_bool("check_updates")
         assert margins.clamp_margin(again.get("margin_mm")) == 7.5
         assert again.get_bool("system_title_bar")  # untouched default survives
@@ -423,7 +358,6 @@ def main() -> int:
     for msgid, msgstr in entries.items():
         if msgid:
             assert sorted(re.findall(r"\{\w+\}", msgid)) == sorted(re.findall(r"\{\w+\}", msgstr)), msgid
-    assert i18n.detect_language() in i18n.LANGUAGES
 
     # --- icons: gdk-pixbuf must be able to sniff them ------------------------
     # It only looks for the <svg> element in the first 256 bytes; past that the

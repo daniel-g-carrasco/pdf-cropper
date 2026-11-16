@@ -12,7 +12,7 @@
   <a href="https://github.com/daniel-g-carrasco/pdf-cropper/actions/workflows/build.yml">
     <img src="https://github.com/daniel-g-carrasco/pdf-cropper/actions/workflows/build.yml/badge.svg" alt="Build">
   </a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0--or--later-blue.svg" alt="License: GPL-3.0-or-later"></a>
 </p>
 
 Drawings often reach you plotted on a sheet much larger than the drawing
@@ -132,8 +132,9 @@ Exit code is non-zero if any file failed. Existing outputs are skipped unless
   become the default app for PDF files.
 - The main menu opens with F10 (GTK convention) or a tap on Alt (Windows
   habit); another tap on Alt closes it.
-- **Updates**: menu → *Controlla aggiornamenti…*, plus an automatic daily
-  check (can be turned off in *Preferenze*). Installed builds download the
+- **Updates**: menu → *Controlla aggiornamenti…*, plus an automatic check
+  when the window opens and when it comes back from the taskbar, every 4
+  hours at most (can be turned off in *Preferenze*). Installed builds download the
   new installer and launch it; the portable build is sent to the release page.
 - Everything above is per-user (`HKEY_CURRENT_USER`) for the portable build;
   *Preferenze* → *Rimuovi* takes it away, as does the uninstaller.
@@ -220,9 +221,17 @@ toolkit) and `gui/` (the GTK window, the only place `gi` is imported). `gui`
 uses `app`, `app` uses `core` and `data`, `core` and `data` know nobody.
 `tests/test_strati.py` reads the imports and fails with file, line and rule.
 
+The modules every app of the author has the same (paths, log, error log,
+updates, signatures, Windows' title bars and icons, translations, atomic
+writes) are copies, byte for byte, of the shared part of the author's app
+model, with their tests: the list and their fingerprints are in
+`impronte/comune.json`, and `tests/test_impronte.py` fails when one is
+edited by hand. They are changed in the model and brought here with its
+`tools/impronte.py --apply`. PDF Cropper gives them its names in
+`src/pdf_cropper/app/services.py`.
+
 ```bash
-python tests/test_crop.py        # self-contained test suite (needs pypdfium2)
-python tests/test_strati.py      # the layers: every import goes one way
+python tools/run_tests.py tests  # the whole suite (needs pypdfium2; tests/test_crop.py also runs by itself)
 python tools/compile_po.py       # compile po/*.po into locale/ (needed to see translations)
 python tools/make_icon.py        # regenerate assets/icon.*, data/icons PNGs, installer bitmaps (Pillow)
 desktop-file-validate data/io.github.daniel_g_carrasco.pdf-cropper.desktop
@@ -241,6 +250,9 @@ change both together.
 
 Preferences are stored in `%LOCALAPPDATA%\pdf-cropper\settings.ini` on
 Windows and `$XDG_CONFIG_HOME/pdf-cropper/settings.ini` on Linux.
+The window's errors are kept in `errors.log` in the state folder
+(`%LOCALAPPDATA%\pdf-cropper\state` on Windows, `~/.local/state/pdf-cropper`
+on Linux), rotated past 1 MB; *About → Troubleshooting* names it.
 
 Translations live in `po/` (English source strings in the code, one `.po`
 per language). To refresh the template after changing strings:
@@ -252,9 +264,14 @@ file (profiling aid), `PDF_CROPPER_NO_ADW=1` to force the plain GTK interface.
 
 ## License
 
-[MIT](LICENSE) © Daniel Grasso
+[GNU General Public License, version 3 or later](LICENSE)
+(GPL-3.0-or-later) © Daniel Grasso, from version 1.1.7: PDF
+Cropper carries copies of modules shared with the author's other apps,
+which are under that licence. The versions up to 1.1.6 were released under
+the MIT licence and stay so.
 
 The packaged builds include [PDFium](https://pdfium.googlesource.com/pdfium/)
 and [pypdfium2](https://github.com/pypdfium2-team/pypdfium2) (BSD-3-Clause /
 Apache-2.0, plus the licences of PDFium's own dependencies), and GTK with its
-libraries (LGPL). Their licence texts ship inside the packages.
+libraries (LGPL). All of them go with the GPL version 3. Their licence
+texts ship inside the packages.

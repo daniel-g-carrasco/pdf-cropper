@@ -41,8 +41,8 @@ msgstr "{cropped} pagine su {pages}"
 msgid "GitHub answered {code}"
 msgstr "GitHub ha risposto {code}"
 
-msgid "unexpected answer from the server"
-msgstr "risposta inattesa dal server"
+msgid "unexpected answer from GitHub"
+msgstr "risposta inattesa da GitHub"
 
 msgid "cancelled"
 msgstr "annullato"
@@ -56,8 +56,8 @@ msgstr "la versione pubblicata non indica l'impronta dell'installer: non è stat
 msgid "the release gives no signature for the installer: not downloaded"
 msgstr "la versione pubblicata non ha la firma dell'installer: non è stato scaricato"
 
-msgid "the installer's signature is not valid: not started"
-msgstr "la firma dell'installer non è valida: non è stato avviato"
+msgid "the installer is not signed by the project: not started"
+msgstr "l'installer non è firmato dal progetto: non è stato avviato"
 
 msgid "the file downloaded does not match the release: not started"
 msgstr "il file scaricato non corrisponde alla versione pubblicata: non è stato avviato"
@@ -339,8 +339,8 @@ msgstr "Generale"
 msgid "Check for updates at start-up"
 msgstr "Controlla aggiornamenti all'avvio"
 
-msgid "Once a day, from the project's GitHub Releases"
-msgstr "Una volta al giorno, dalle Release del progetto su GitHub"
+msgid "Every 4 hours at most, from the project's GitHub Releases"
+msgstr "Al massimo ogni 4 ore, dalle Release del progetto su GitHub"
 
 msgid "File Explorer"
 msgstr "Esplora file"

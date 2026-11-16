@@ -5,13 +5,27 @@ from __future__ import annotations
 import os
 import sys
 
-from pdf_cropper.app.settings import Settings
+from pdf_cropper.app import log
+from pdf_cropper.app.config import Settings
 from pdf_cropper.app.windows_shell import win_register, win_unregister
 from pdf_cropper.core.margins import DEFAULT_MARGIN_MM
 
-from . import _mark
+from . import PACKAGE_DIR, SLUG, TEXTDOMAIN, WINDOWS, _mark, i18n
 from .cli import build_parser, run_check_update, run_cli
-from .i18n import _, setup_i18n
+from .i18n import _
+
+LANGUAGES = ("en", "it")        # the languages of the preference; "auto" is the desktop's
+
+
+def setup_language(choice: str) -> None:
+    """The catalogue for the preference (`choice`: "auto", "it" or "en"),
+    before any text is built. GTK's own strings (dialog buttons, the file
+    chooser) come from libintl, which honours LANGUAGE: on Windows, and
+    whenever a language is chosen, it is kept in step with ours."""
+    chosen = choice if choice in LANGUAGES else ""
+    i18n.setup(TEXTDOMAIN, PACKAGE_DIR.parent.parent, chosen)
+    if WINDOWS or chosen:
+        os.environ["LANGUAGE"] = i18n.language()
 
 
 def main() -> int:
@@ -29,8 +43,9 @@ def main() -> int:
         except (AttributeError, ValueError):
             pass
 
+    log.setup(SLUG)
     settings = Settings()
-    setup_i18n(settings.get("language"))
+    setup_language(settings.get("language"))
     args = build_parser().parse_args()
 
     if args.check_update:
@@ -49,6 +64,11 @@ def main() -> int:
     if args.paths and not args.gui:
         margin = args.margin if args.margin is not None else DEFAULT_MARGIN_MM
         return run_cli(args.paths, args.overwrite, margin, args.threshold)
+    # the window's errors kept in a file too (app/errorlog.py): started from
+    # the desktop or the context menu nobody reads stderr, and the Windows
+    # build has none. The command line keeps speaking in its terminal.
+    from pdf_cropper.app import errorlog, services
+    errorlog.install(errorlog.log_file(services.app_paths().state))
     from pdf_cropper.gui.application import run_gui         # the toolkit, only when a window is wanted
     return run_gui(sys.argv, settings)
 

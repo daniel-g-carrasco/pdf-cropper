@@ -7,7 +7,10 @@ import sys
 from pdf_cropper import PACKAGE_DIR, WIN_VERB
 from pdf_cropper.i18n import _
 
-from .updates import is_frozen
+
+def is_frozen() -> bool:
+    """The built app (PyInstaller), not a run from the sources."""
+    return bool(getattr(sys, "frozen", False))
 
 # One context-menu entry on PDF files. Unlike a viewer, this tool has no
 # business being the default app for .pdf: nothing else is registered.

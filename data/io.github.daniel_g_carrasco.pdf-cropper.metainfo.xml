@@ -3,7 +3,7 @@
 <component type="desktop-application">
   <id>io.github.daniel_g_carrasco.pdf-cropper</id>
   <metadata_license>CC0-1.0</metadata_license>
-  <project_license>MIT</project_license>
+  <project_license>GPL-3.0-or-later</project_license>
 
   <name>PDF Cropper</name>
   <summary>Crop the white margins of PDF pages</summary>
@@ -71,6 +71,13 @@
   </requires>
 
   <releases>
+    <release version="1.1.7" date="2026-11-16">
+      <description>
+        <p>From this version PDF Cropper is under the GNU General Public License, version 3 or later. The versions up to 1.1.6 were released under the MIT licence and stay so.</p>
+        <p>The window's errors are kept in an errors file, and About has a Troubleshooting page with the version, the folders, the errors file and the preferences, to copy into a report of a problem.</p>
+        <p>Windows: the check for a newer version is made when the window opens and when it comes back from the taskbar, every 4 hours at most. The preferences are written whole or not at all.</p>
+      </description>
+    </release>
     <release version="1.1.6" date="2026-11-10">
       <description>
         <p>Windows: the window resizes, maximizes and drags as Windows itself does it again. The workarounds of the last versions got in the way of that and are replaced by lighter ones: opening the menu no longer shrinks a maximized window, and a menu left open when the window is minimized is closed when the window comes back.</p>
