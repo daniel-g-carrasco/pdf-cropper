@@ -5,6 +5,12 @@ The changes that matter to whoever uses PDF Cropper. The versions up to
 
 ## [Unreleased]
 
+### Changed
+- A new icon, in the style now shared by the apps of the same family (Scriba, Meridiana and the others): blue and yellow scissors cutting a white piece of paper,
+  flat shapes with the light on the left and the shadow on the right, on a square canvas with a little thickness below
+  it. On Windows the icon reaches the edge of its square in the taskbar, with a drawing of its own for 16-24 px.
+  `tools/make_icon.py` now makes every size from the SVG.
+
 ## [1.1.7] - 2026-11-16
 
 ### Changed

@@ -233,7 +233,7 @@ edited by hand. They are changed in the model and brought here with its
 ```bash
 python tools/run_tests.py tests  # the whole suite (needs pypdfium2; tests/test_crop.py also runs by itself)
 python tools/compile_po.py       # compile po/*.po into locale/ (needed to see translations)
-python tools/make_icon.py        # regenerate assets/icon.*, data/icons PNGs, installer bitmaps (Pillow)
+python tools/make_icon.py        # regenerate assets/icon.*, data/icons PNGs, installer bitmaps from the SVG (GdkPixbuf, Pillow)
 desktop-file-validate data/io.github.daniel_g_carrasco.pdf-cropper.desktop
 appstreamcli validate --no-net data/io.github.daniel_g_carrasco.pdf-cropper.metainfo.xml
 ```
