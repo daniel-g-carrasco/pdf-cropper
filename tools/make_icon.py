@@ -1,109 +1,99 @@
 #!/usr/bin/env python3
-"""Generate the raster application icons (requires Pillow):
+"""Generate the raster application icons from the scalable one (PyGObject with
+GdkPixbuf and librsvg, which GTK brings, draws the SVG; Pillow writes the
+installer bitmaps):
 
-  assets/icon.ico, assets/icon.png            Windows exe / installer icon
-  data/icons/hicolor/<N>x<N>/apps/<APP_ID>.png icon-theme PNGs (64, 128, 256)
-  installer/wizard-small-<dpi>.bmp             Inno Setup wizard header image
-  installer/wizard-large-<dpi>.bmp             Inno Setup finish-page image
+  data/icons/hicolor/<N>x<N>/apps/<APP_ID>.png  icon-theme PNGs (64, 128, 256)
+  assets/icon.ico, assets/icon.png              Windows exe / installer icon
+  installer/wizard-small-<dpi>.bmp              Inno Setup wizard header image
+  installer/wizard-large-<dpi>.bmp              Inno Setup finish-page image
 
-Drawn at high resolution and downscaled, so every size stays crisp.
-Design: white document with a folded corner on a green rounded tile, with
-an orange badge carrying the crop-tool glyph (two interlocked corners).
-The scalable version of the same design lives in
-data/icons/hicolor/scalable/apps/<APP_ID>.svg.
+The master is data/icons/hicolor/scalable/apps/<APP_ID>.svg, exported as a
+plain SVG from the Inkscape master assets/icona.svg: edit that, export, run
+this. Design: the family's square canvas with blue and yellow scissors cutting a white piece of paper; flat shapes, the light on the left and the shadow on the
+right, on a canvas that stands 480 of 512.
+
+The theme's PNGs keep the margin the SVG has, as Linux expects. Windows shrinks
+the icon to 16-24 pixels in the taskbar, where a margin is only a smaller
+icon: the .ico is drawn with the view closed on the canvas (FULL_VIEW), and
+for 16, 20 and 24 pixels from assets/icon-small.svg, drawn on the 16 pixel grid.
 """
 
+import io
+import struct
 from pathlib import Path
 
-from PIL import Image, ImageDraw
+import gi
+
+gi.require_version("GdkPixbuf", "2.0")
+from gi.repository import GdkPixbuf  # noqa: E402
+from PIL import Image  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 APP_ID = "io.github.daniel_g_carrasco.pdf-cropper"
-
-S = 1024  # master canvas, downscaled at the end
-
-GREEN = (38, 162, 105, 255)       # tile
-GREEN_DARK = (24, 104, 68, 255)   # fold shadow
+SVG = ROOT / "data" / "icons" / "hicolor" / "scalable" / "apps" / f"{APP_ID}.svg"
+SMALL_SVG = ROOT / "assets" / "icon-small.svg"
+SIZES = (16, 20, 24, 32, 40, 48, 64, 128, 256)
+SMALL = (16, 20, 24)
+FULL_VIEW = ('viewBox="0 0 512 512"', 'viewBox="16 16 480 480"')
 WHITE = (255, 255, 255, 255)
-PAPER_LINE = (160, 185, 172, 255)
-ORANGE = (230, 97, 0, 255)        # badge
 
 
-def render_master() -> Image.Image:
-    """Return the icon as a 1024x1024 RGBA image."""
-    img = Image.new("RGBA", (S, S), (0, 0, 0, 0))
-    d = ImageDraw.Draw(img)
+def png(svg_text: str, size: int) -> bytes:
+    """The SVG drawn on a transparent square of `size` pixels, as PNG bytes."""
+    loader = GdkPixbuf.PixbufLoader()
+    loader.set_size(size, size)
+    loader.write(svg_text.encode("utf-8"))
+    loader.close()
+    _ok, data = loader.get_pixbuf().save_to_bufferv("png", [], [])
+    return bytes(data)
 
-    # green rounded tile
-    d.rounded_rectangle((64, 64, S - 64, S - 64), radius=180, fill=GREEN)
 
-    # document sheet with folded top-right corner
-    sx0, sy0, sx1, sy1 = 280, 200, 744, 824
-    fold = 120
-    d.polygon(
-        [(sx0, sy0), (sx1 - fold, sy0), (sx1, sy0 + fold),
-         (sx1, sy1), (sx0, sy1)],
-        fill=WHITE,
-    )
-    d.polygon(
-        [(sx1 - fold, sy0), (sx1 - fold, sy0 + fold), (sx1, sy0 + fold)],
-        fill=GREEN_DARK,
-    )
+def image(data: bytes) -> Image.Image:
+    return Image.open(io.BytesIO(data)).convert("RGBA")
 
-    # text lines on the sheet
-    for i, y in enumerate(range(sy0 + 130, sy0 + 420, 72)):
-        d.rounded_rectangle(
-            (sx0 + 70, y, sx1 - 70 - (60 if i % 2 else 0), y + 30),
-            radius=15, fill=PAPER_LINE,
-        )
 
-    # badge with the crop glyph: two interlocked L shapes
-    cx, cy, r = 660, 760, 150
-    d.ellipse((cx - r, cy - r, cx + r, cy + r), fill=ORANGE)
-    width = 26
-    for points in (
-        [(cx - 50, cy - 90), (cx - 50, cy + 50), (cx + 90, cy + 50)],
-        [(cx - 90, cy - 50), (cx + 50, cy - 50), (cx + 50, cy + 90)],
-    ):
-        d.line(points, fill=WHITE, width=width, joint="curve")
-        for x, y in (points[0], points[-1]):  # round caps
-            d.ellipse((x - width / 2, y - width / 2, x + width / 2, y + width / 2), fill=WHITE)
-    return img
+def ico(images: list[tuple[int, bytes]]) -> bytes:
+    """An .ico holding each (size, PNG) as it is (Windows Vista and later read PNG entries)."""
+    offset = 6 + 16 * len(images)
+    entries, payload = b"", b""
+    for size, data in images:
+        entries += struct.pack("<BBBBHHII", size % 256, size % 256, 0, 0, 1, 32, len(data), offset + len(payload))
+        payload += data
+    return struct.pack("<HHH", 0, 1, len(images)) + entries + payload
 
 
 def main() -> None:
-    img = render_master()
+    text = SVG.read_text(encoding="utf-8")
+    windows = text.replace(*FULL_VIEW)
+    small = SMALL_SVG.read_text(encoding="utf-8") if SMALL_SVG.is_file() else None
 
     out = ROOT / "assets"
     out.mkdir(exist_ok=True)
-    master = img.resize((256, 256), Image.LANCZOS)
-    master.save(out / "icon.png")
-    master.save(
-        out / "icon.ico",
-        sizes=[(16, 16), (20, 20), (24, 24), (32, 32), (48, 48),
-               (64, 64), (128, 128), (256, 256)],
-    )
+    (out / "icon.ico").write_bytes(ico([(size, png(small if small and size in SMALL else windows, size))
+                                        for size in SIZES]))
+    image(png(windows, 256)).save(out / "icon.png")
     print(f"written: {out / 'icon.ico'} and icon.png")
 
     for size in (64, 128, 256):
         dest = ROOT / "data" / "icons" / "hicolor" / f"{size}x{size}" / "apps" / f"{APP_ID}.png"
         dest.parent.mkdir(parents=True, exist_ok=True)
-        img.resize((size, size), Image.LANCZOS).save(dest)
+        dest.write_bytes(png(text, size))
         print(f"written: {dest.relative_to(ROOT)}")
 
     # Inno Setup wizard bitmaps (24-bit BMP, white background), one per DPI
     # scale; the sizes are the ones documented for WizardSmallImageFile and
     # WizardImageFile. Setup picks the closest match at run time.
-    small = {100: (55, 58), 125: (64, 68), 150: (83, 80), 175: (92, 97),
-             200: (110, 106), 225: (119, 123), 250: (138, 140)}
-    large = {100: (164, 314), 125: (192, 386), 150: (246, 459), 175: (273, 556),
-             200: (328, 604), 225: (355, 700), 250: (410, 797)}
-    (ROOT / "installer").mkdir(exist_ok=True)
-    for kind, sizes in (("small", small), ("large", large)):
+    master = image(png(windows, 1024))
+    small_sizes = {100: (55, 58), 125: (64, 68), 150: (83, 80), 175: (92, 97),
+                   200: (110, 106), 225: (119, 123), 250: (138, 140)}
+    large_sizes = {100: (164, 314), 125: (192, 386), 150: (246, 459), 175: (273, 556),
+                   200: (328, 604), 225: (355, 700), 250: (410, 797)}
+    for kind, sizes in (("small", small_sizes), ("large", large_sizes)):
         for dpi, (w, h) in sizes.items():
             canvas = Image.new("RGBA", (w, h), WHITE)
             side = min(w, h) - 6 if kind == "small" else int(w * 0.62)
-            icon = img.resize((side, side), Image.LANCZOS)
+            icon = master.resize((side, side), Image.LANCZOS)
             y = (h - side) // 2 if kind == "small" else int(h * 0.18)
             canvas.alpha_composite(icon, ((w - side) // 2, y))
             dest = ROOT / "installer" / f"wizard-{kind}-{dpi}.bmp"
