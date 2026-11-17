@@ -3,7 +3,7 @@
 The changes that matter to whoever uses PDF Cropper. The versions up to
 1.1.6 are described in their GitHub releases.
 
-## [Unreleased]
+## [1.1.8] - 2026-11-17
 
 ### Changed
 - A new icon, in the style now shared by the apps of the same family (Scriba, Meridiana and the others): blue and yellow scissors cutting a white piece of paper,

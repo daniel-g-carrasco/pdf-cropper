@@ -71,6 +71,11 @@
   </requires>
 
   <releases>
+    <release version="1.1.8" date="2026-11-17">
+      <description>
+        <p>A new icon, in the style now shared by the apps of the same family: blue and yellow scissors cutting a white piece of paper, on a square canvas with a little thickness below it. On Windows it reaches the edge of its square in the taskbar, with a drawing of its own for the small sizes.</p>
+      </description>
+    </release>
     <release version="1.1.7" date="2026-11-16">
       <description>
         <p>From this version PDF Cropper is under the GNU General Public License, version 3 or later. The versions up to 1.1.6 were released under the MIT licence and stay so.</p>
