@@ -6,8 +6,8 @@ second, never-rendered instance; and the PDF files of the folders given.
 from __future__ import annotations
 
 import math
-import os
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from pdf_cropper.core.margins import (
     CropError,
@@ -20,6 +20,7 @@ from pdf_cropper.core.margins import (
     cropped_name,
     ink_bbox,
 )
+from pdf_cropper.data.atomic import replace_patiently
 from pdf_cropper.data.pdf import _ERR_PASSWORD, _apply_box
 from pdf_cropper.i18n import _
 
@@ -137,7 +138,6 @@ def crop_file(src: Path, margin_mm: float = DEFAULT_MARGIN_MM, overwrite: bool =
         raise NothingToCrop(str(src))
 
     # Pass 2: write.
-    tmp = dest.with_name(dest.name + ".part")
     first_size = None
     pdf = pdfium.PdfDocument(data)
     try:
@@ -148,17 +148,17 @@ def crop_file(src: Path, margin_mm: float = DEFAULT_MARGIN_MM, overwrite: bool =
             finally:
                 page.close()
             first_size = first_size or shown
-        with open(tmp, "wb") as out:
-            pdf.save(out)
-        os.replace(tmp, dest)
+        with TemporaryDirectory(dir=dest.parent, prefix=".pdf-cropper-") as folder:
+            tmp = Path(folder) / "output.pdf"
+            with tmp.open("wb") as out:
+                pdf.save(out)
+            if dest.exists() and not overwrite:
+                raise FileExistsError(str(dest))
+            replace_patiently(tmp, dest)
     except pdfium.PdfiumError as e:
         raise CropError(str(e)) from None
     finally:
         pdf.close()
-        try:
-            tmp.unlink()
-        except OSError:
-            pass
     report(1.0)
     return CropResult(dest, pages, len(boxes), first_size[0] / MM, first_size[1] / MM)
 

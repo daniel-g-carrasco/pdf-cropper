@@ -162,6 +162,8 @@ def run_all() -> int:
         # --- plain page: boxes shrink around the rectangle ---------------------
         f = td / "plain.pdf"
         f.write_bytes(SAMPLE)
+        partial = td / "plain_cropped.pdf.part"
+        partial.write_bytes(b"incomplete work from another program")
         seen = []
         res = cropping.crop_file(f, margin_mm=0, progress=seen.append)
         assert res.dest == td / "plain_cropped.pdf" and res.pages == 1 and res.cropped == 1
@@ -174,6 +176,9 @@ def run_all() -> int:
         assert seen == sorted(seen) and seen[-1] == 1.0 and 0.0 < seen[0] <= 0.1
         # the original is untouched
         assert f.read_bytes() == SAMPLE
+        assert partial.read_bytes() == b"incomplete work from another program"
+        assert {entry.name for entry in td.iterdir()} == {f.name, res.dest.name, partial.name}
+        partial.unlink()
 
         # --- margin: grows the box, never past the page -------------------------
         expect_raises(FileExistsError, cropping.crop_file, f)
