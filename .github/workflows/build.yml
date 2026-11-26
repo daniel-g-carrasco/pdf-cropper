@@ -7,6 +7,9 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 env:
   # The PDF engine. Keep in step with the wheels pinned in the Flatpak
   # manifest (build-aux/flatpak/).
@@ -114,6 +117,10 @@ jobs:
           gtk4-update-icon-cache -q -t -f "$I/share/icons/Adwaita"
           gtk4-update-icon-cache -q -t -f "$I/share/icons/hicolor"
           du -sm "$I" | cut -f1 | xargs -I{} echo "bundle after slimming: {} MB"
+      - name: Verify the staged Windows inventory
+        run: |
+          python tools/package_inventory.py --bundle dist/pdf-cropper --seal pdf-cropper.exe \
+            --msys-root "$(cygpath -w /)"
       - name: Smoke test (CLI through the bundled exe)
         run: |
           python tests/test_crop.py --make-sample sample.pdf
@@ -180,14 +187,28 @@ jobs:
           Start-Sleep 15
           if (-not (Get-Process pdf-cropper -ErrorAction SilentlyContinue)) { Write-Error 'the app was not opened again'; exit 1 }
           Get-Process pdf-cropper | Stop-Process
+      - name: Record Windows release components
+        run: |
+          python tools/package_inventory.py --portable pdf-cropper-*-windows-x64-portable.zip
+          version=$(PYTHONPATH=dist/pdf-cropper/_internal python -c 'from importlib.metadata import version; print(version("pypdfium2"))')
+          python tools/release_inventory.py create --revision "$GITHUB_SHA" \
+            --gtk-inventory dist/pdf-cropper/_internal/licenses/inventory.json \
+            --component "PyPI:pypdfium2=$version" \
+            pdf-cropper-*-windows-x64-portable.zip installer/Output/pdf-cropper-setup-*.exe
       - uses: actions/upload-artifact@v7
         with:
           name: windows-x64
-          path: pdf-cropper-*-windows-x64-portable.zip
+          if-no-files-found: error
+          path: |
+            pdf-cropper-*-windows-x64-portable.zip
+            pdf-cropper-*-windows-x64-portable.zip.inventory.json
       - uses: actions/upload-artifact@v7
         with:
           name: windows-installer
-          path: installer/Output/pdf-cropper-setup-*.exe
+          if-no-files-found: error
+          path: |
+            installer/Output/pdf-cropper-setup-*.exe
+            installer/Output/pdf-cropper-setup-*.exe.inventory.json
 
   linux:
     needs: test
@@ -240,10 +261,25 @@ jobs:
           VERSION="${GITHUB_REF_NAME}"
           case "$VERSION" in v*) ;; *) VERSION=dev ;; esac
           tar -C dist -czf "pdf-cropper-${VERSION}-linux-x64-portable.tar.gz" pdf-cropper
+      - name: Record Linux portable components
+        run: |
+          .venv/bin/python -m pip list --path dist/pdf-cropper/_internal --format json \
+            > "$RUNNER_TEMP/pdf-cropper-linux-python.json"
+          native=()
+          for package in libgtk-4-1 libadwaita-1-0; do
+            version=$(dpkg-query -W -f='${Version}' "$package")
+            native+=(--component "Ubuntu:$package=$version")
+          done
+          python3 tools/release_inventory.py create --revision "$GITHUB_SHA" \
+            --linux-inventory "$RUNNER_TEMP/pdf-cropper-linux-python.json" "${native[@]}" \
+            pdf-cropper-*-linux-x64-portable.tar.gz
       - uses: actions/upload-artifact@v7
         with:
           name: linux-x64
-          path: pdf-cropper-*-linux-x64-portable.tar.gz
+          if-no-files-found: error
+          path: |
+            pdf-cropper-*-linux-x64-portable.tar.gz
+            pdf-cropper-*-linux-x64-portable.tar.gz.inventory.json
 
   flatpak:
     needs: test
@@ -259,7 +295,19 @@ jobs:
           bundle: pdf-cropper-${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'dev' }}-linux-x64.flatpak
           manifest-path: build-aux/flatpak/io.github.daniel_g_carrasco.pdf-cropper.yaml
           cache-key: flatpak-builder-${{ github.sha }}
-          upload-artifact: true
+          build-dir: flatpak-output
+          upload-artifact: false
+      - name: Record Flatpak components
+        run: |
+          python3 tools/release_inventory.py create --revision "$GITHUB_SHA" \
+            --flatpak flatpak-output pdf-cropper-*.flatpak
+      - uses: actions/upload-artifact@v7
+        with:
+          name: linux-flatpak
+          if-no-files-found: error
+          path: |
+            pdf-cropper-*.flatpak
+            pdf-cropper-*.flatpak.inventory.json
       - name: Lint the manifest for Flathub (informational)
         run: |
           if command -v flatpak-builder-lint >/dev/null 2>&1; then
@@ -275,9 +323,22 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
       - uses: actions/download-artifact@v8
         with:
           merge-multiple: true
+      - name: Verify package inventories and check advisories
+        run: |
+          packages=(
+            "pdf-cropper-setup-$GITHUB_REF_NAME-windows-x64.exe"
+            "pdf-cropper-$GITHUB_REF_NAME-windows-x64-portable.zip"
+            "pdf-cropper-$GITHUB_REF_NAME-linux-x64-portable.tar.gz"
+            "pdf-cropper-$GITHUB_REF_NAME-linux-x64.flatpak"
+          )
+          python3 tools/release_inventory.py check --revision "$GITHUB_SHA" "${packages[@]}"
+          python3 tools/release_inventory.py audit "${packages[@]}"
       - name: Sign with the project's key (minisign), checked before anything is uploaded
         # the installed app runs an update only with this signature (the same
         # public key is in the code); the comment names the file, so another
@@ -295,7 +356,7 @@ jobs:
              *) printf 'untrusted comment: releases\n%s\n' "$MINISIGN_SECRET_KEY" ;;
            esac | tr -d '\r' > "$key")
           ls *-setup-v*-windows-x64.exe
-          for f in *.zip *.tar.gz *.exe *.flatpak; do
+          for f in *.zip *.tar.gz *.exe *.flatpak *.inventory.json; do
             [ -f "$f" ] || continue
             minisign -S -s "$key" -m "$f" -x "$f.minisig" -t "timestamp:$(date +%s) file:$f hashed" </dev/null
             minisign -V -P "$PUBLIC_KEY" -m "$f" -x "$f.minisig"
@@ -308,5 +369,7 @@ jobs:
             *.tar.gz
             *.exe
             *.flatpak
+            *.inventory.json
             *.minisig
+          fail_on_unmatched_files: true
           generate_release_notes: true

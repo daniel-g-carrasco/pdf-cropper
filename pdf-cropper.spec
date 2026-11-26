@@ -101,6 +101,17 @@ a = Analysis(
     hooksconfig={'gi': {'module-versions': GI_VERSIONS}},
 )
 
+if WIN:
+    root = Path(SPECPATH)
+    sys.path.insert(0, str(root / 'tools'))
+    from package_inventory import inventory
+
+    pure = [row for row in a.pure if row[1] != '-']
+    _, notices = inventory([*a.binaries, *a.datas, *pure, *a.scripts],
+                           prefix.parent, root, Path(workpath),
+                           revision=os.environ.get('GITHUB_SHA', 'dev'))
+    a.datas += notices
+
 pyz = PYZ(a.pure)
 
 # Windows: embed our own manifest, which declares system DPI awareness on

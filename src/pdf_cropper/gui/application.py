@@ -230,7 +230,7 @@ def run_gui(argv, settings: Settings) -> int:
         if has_filedialog:  # GTK >= 4.10
             Gtk.UriLauncher.new(uri).launch(parent, None, None)
         elif is_win:
-            os.startfile(uri)
+            os.startfile(uri)  # noqa: S606 - opens the GitHub release page on user action
         else:
             Gio.AppInfo.launch_default_for_uri(uri, None)
 
@@ -880,7 +880,7 @@ def run_gui(argv, settings: Settings) -> int:
                 return
             try:
                 if is_win:
-                    os.startfile(str(dest))
+                    os.startfile(str(dest))  # noqa: S606 - opens the generated document on user action
                 elif has_filedialog:  # GTK >= 4.10
                     Gtk.FileLauncher.new(Gio.File.new_for_path(str(dest))).launch(
                         self, None, None)
@@ -1056,7 +1056,7 @@ def run_gui(argv, settings: Settings) -> int:
                 try:
                     subprocess.Popen(f'explorer /select,"{dest}"')
                 except OSError:
-                    os.startfile(dest.parent)
+                    os.startfile(dest.parent)  # noqa: S606 - opens the containing folder on user action
             elif has_filedialog:  # GTK >= 4.10
                 launcher = Gtk.FileLauncher.new(
                     Gio.File.new_for_path(str(dest)))

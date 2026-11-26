@@ -75,6 +75,13 @@ jobs:
         env:
           FLATPAK_GPG_KEY_ID: ${{ vars.FLATPAK_GPG_KEY_ID }}
 
+      - name: Check the Flatpak before publishing the OSTree ref
+        run: |
+          python3 tools/release_inventory.py pages-create --revision "$GITHUB_SHA" \
+            --flatpak build-dir --pages pages --app-id io.github.daniel_g_carrasco.pdf-cropper
+          python3 tools/release_inventory.py pages-audit --pages pages \
+            --app-id io.github.daniel_g_carrasco.pdf-cropper
+
       - name: Write the .flatpakref, .flatpakrepo and index page
         run: |
           key="$(gpg --batch --export "$FLATPAK_GPG_KEY_ID" | base64 -w0)"

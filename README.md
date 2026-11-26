@@ -213,6 +213,15 @@ output directory `site`).
 
 ## Development
 
+Pull requests run the template's Ruff security rules and redacted Gitleaks
+scan. The release jobs verify dependency inventories and query OSV before
+publishing the installer, portable archives, and Flatpak bundle. The Pages
+build checks its own inventory against the OSTree commit it publishes.
+The weekly audit verifies both channels and reports missing inventories on
+older releases. It checks the packaged PDFium wheel by its PyPI version.
+The inventory also records the MSYS2 packages, the listed Ubuntu libraries,
+and the Flatpak runtime for review against their advisory sources.
+
 The code is the package `src/pdf_cropper/`, in four layers with the imports
 going one way only: `core/` (the box around the ink, the margin, the names:
 values in, values out), `data/` (the page boxes of the PDF), `app/` (a file
