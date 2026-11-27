@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "artifact": "io.github.daniel_g_carrasco.pdf-cropper-x86_64-stable.ostree-ref",
+  "sha256": "2b33518047cc7b11f3d9e7ca9611097e10a63840bab19b12c788eb59dd1c4ec6",
+  "revision": "725e7b16433652a50cc58d549e25b425067d9966",
+  "platform": "flatpak",
+  "components": [
+    {
+      "ecosystem": "Flatpak",
+      "name": "org.gnome.Platform/x86_64/50",
+      "version": "47406407f781b156c267b67c78a80a60715c0ff34ab2c051029c61d65fe86c11"
+    },
+    {
+      "ecosystem": "PyPI",
+      "name": "pypdfium2",
+      "version": "5.13.0"
+    }
+  ],
+  "ostree_commit": "fb60e704c47a45086709e6ca3708ab10e1f573696a78fe68c024dde0dfd2ebed"
+}
