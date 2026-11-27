@@ -71,6 +71,12 @@
   </requires>
 
   <releases>
+    <release version="1.1.9" date="2026-11-27">
+      <description>
+        <p>A cropped copy is written in a temporary folder next to the destination and then put in place, so a file with the same name plus .part left by another program is no longer touched.</p>
+        <p>The Windows packages carry the original licence texts of the bundled libraries, and each release comes with a signed inventory of its components.</p>
+      </description>
+    </release>
     <release version="1.1.8" date="2026-11-17">
       <description>
         <p>A new icon, in the style now shared by the apps of the same family: blue and yellow scissors cutting a white piece of paper, on a square canvas with a little thickness below it. On Windows it reaches the edge of its square in the taskbar, with a drawing of its own for the small sizes.</p>
