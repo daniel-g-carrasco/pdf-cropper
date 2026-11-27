@@ -106,6 +106,9 @@ if WIN:
     sys.path.insert(0, str(root / 'tools'))
     from package_inventory import inventory
 
+    # MSYS2's icon caches come from a pacman hook, not from a package: the
+    # workflow writes fresh ones for the slimmed themes and the seal records them.
+    a.datas = [row for row in a.datas if Path(row[0]).name != 'icon-theme.cache']
     pure = [row for row in a.pure if row[1] != '-']
     _, notices = inventory([*a.binaries, *a.datas, *pure, *a.scripts],
                            prefix.parent, root, Path(workpath),

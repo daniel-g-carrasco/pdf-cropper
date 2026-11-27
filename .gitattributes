@@ -1,2 +1,4 @@
 # Shell scripts run in CI containers and under MSYS2: always LF.
 *.sh text eol=lf
+# Original notices keep their bytes: PROVENANCE.json records their SHA-256.
+LICENSES/upstream/** -text

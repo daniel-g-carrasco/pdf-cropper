@@ -1,0 +1,13 @@
+{
+  "package": "mingw-w64-ucrt-x86_64-ca-certificates",
+  "version": "20260816-6",
+  "source_url": "https://repo.msys2.org/mingw/sources/mingw-w64-ca-certificates-20260816-6.src.tar.zst",
+  "source_sha256": "31829e676a1413ef1fa8d93937da5b3c23092570a44e10914d9bf1508c6ba3eb",
+  "files": [
+    {
+      "file": "debian/copyright",
+      "sha256": "1ae033c4679e4440848d2fcf6bc8e57d4da2644662775f401e2fede57862674c",
+      "source_member": "mingw-w64-ca-certificates/ca-certificates_20260816+nmu1.tar.xz!/ca-certificates/debian/copyright"
+    }
+  ]
+}

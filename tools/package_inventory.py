@@ -95,6 +95,29 @@ def wheel_origins():
     return wheels, owners
 
 
+def upstream_notices(project_root, package):
+    """Use original notices verified against the matching signed source."""
+    prefix = "mingw-w64-ucrt-x86_64-"
+    name, version = package["name"], package["version"]
+    if not name.startswith(prefix):
+        return []
+    folder = project_root / "LICENSES/upstream" / relative_path(name.removeprefix(prefix))
+    folder /= relative_path(version.replace(":", "~"))
+    provenance = folder / "PROVENANCE.json"
+    if not provenance.is_file():
+        return []
+    receipt = json.loads(provenance.read_bytes())
+    if (receipt["package"], receipt["version"]) != (name, version):
+        raise InventoryError(f"upstream notice receipt does not match {name} {version}")
+    notices = []
+    for item in receipt["files"]:
+        path = folder / relative_path(item["file"])
+        if sha256(path) != item["sha256"]:
+            raise InventoryError(f"upstream notice changed: {path}")
+        notices.append((path, item["file"]))
+    return notices
+
+
 def inventory(toc, msys_root: Path, project_root: Path, work: Path, *, revision="unrecorded", expected_versions=None):
     """Build the inventory and PyInstaller data entries from Analysis' table of contents."""
     msys_root, project_root, work = (Path(path).resolve() for path in (msys_root, project_root, work))
@@ -121,20 +144,21 @@ def inventory(toc, msys_root: Path, project_root: Path, work: Path, *, revision=
             origin = installed
             original_notices = [(msys_root / item, item.split("/share/licenses/", 1)[-1])
                                 for item in stored["notice_inputs"]]
+            original_notices = original_notices or upstream_notices(project_root, component)
         elif generated is not None:
             component = {"kind": "generated", "name": "pyinstaller", "version": revision}
             origin = generated
-        elif own is not None:
-            component = {"kind": "project", "name": "project", "version": revision,
-                         "license_files": []}
-            origin = own
-            original_notices = [(project_root / "LICENSE", "LICENSE")]
         elif any(part.casefold() in ("site-packages", "dist-packages") for part in path.parts):
             if wheel_files is None:
                 wheels, wheel_files = wheel_origins()
             if path in wheel_files:
                 owner, origin = wheel_files[path]
                 component, original_notices = wheels[owner]
+        elif own is not None and installed is None:
+            component = {"kind": "project", "name": "project", "version": revision,
+                         "license_files": []}
+            origin = own
+            original_notices = [(project_root / "LICENSE", "LICENSE")]
         if component is None:
             issues.append({"target": target, "reason": "no recorded origin"})
         key = f"{component['kind']}:{component['name']}" if component else None
@@ -171,7 +195,7 @@ def package_listing(components):
     lines = ["MSYS2 packages collected by PyInstaller", ""]
     for item in sorted((item for item in components.values() if item["kind"] == "msys2"),
                        key=lambda item: item["name"]):
-        arc = f"{item['base']}-{item['version'].split(':')[-1]}.src.tar.zst"
+        arc = f"{item['base']}-{item['version'].replace(':', '~')}.src.tar.zst"
         lines += [f"{item['name']} {item['version']}", "  License: " + ", ".join(item["licenses"]),
                   f"  Source archive: https://repo.msys2.org/mingw/sources/{arc}",
                   *(f"  {path}" for path in item["license_files"]), ""]

@@ -1,0 +1,13 @@
+{
+  "package": "mingw-w64-ucrt-x86_64-gst-plugins-bad-libs",
+  "version": "1.28.9-2",
+  "source_url": "https://repo.msys2.org/mingw/sources/mingw-w64-gst-plugins-bad-1.28.9-2.src.tar.zst",
+  "source_sha256": "693fc3a4759d4530be01674546039c5023a0a5a96fe63a1e48925a654f5be43a",
+  "files": [
+    {
+      "file": "COPYING",
+      "sha256": "dc626520dcd53a22f727af3ee42c770e56c97a64fe3adb063799d8ab032fe551",
+      "source_member": "mingw-w64-gst-plugins-bad/gst-plugins-bad-1.28.9.tar.xz!/gst-plugins-bad-1.28.9/COPYING"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "package": "mingw-w64-ucrt-x86_64-gobject-introspection-runtime",
+  "version": "1.86.0-4",
+  "source_url": "https://repo.msys2.org/mingw/sources/mingw-w64-gobject-introspection-1.86.0-4.src.tar.zst",
+  "source_sha256": "5248567008ccd01c1c69a96610ce63d5991018b70487667fd27791d47bc0a5d6",
+  "files": [
+    {
+      "file": "COPYING",
+      "sha256": "1b3275b028bcaa77e4580a302ae80473abb97139b84a0e48618be34cd65f8aaa",
+      "source_member": "mingw-w64-gobject-introspection/gobject-introspection-1.86.0.tar.xz!/gobject-introspection-1.86.0/COPYING"
+    },
+    {
+      "file": "COPYING.GPL",
+      "sha256": "4c1cedcbb4a12ea964f1160dbbf36099e5a59b96129a99a1a1a61f2cb09271fb",
+      "source_member": "mingw-w64-gobject-introspection/gobject-introspection-1.86.0.tar.xz!/gobject-introspection-1.86.0/COPYING.GPL"
+    },
+    {
+      "file": "COPYING.LGPL",
+      "sha256": "faa2e414bd5f91d2d2c39e85c7cc3f2ccde05c3306f96b404f8ed8cf0266c279",
+      "source_member": "mingw-w64-gobject-introspection/gobject-introspection-1.86.0.tar.xz!/gobject-introspection-1.86.0/COPYING.LGPL"
+    }
+  ]
+}

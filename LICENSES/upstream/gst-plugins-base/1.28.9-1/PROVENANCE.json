@@ -1,0 +1,13 @@
+{
+  "package": "mingw-w64-ucrt-x86_64-gst-plugins-base",
+  "version": "1.28.9-1",
+  "source_url": "https://repo.msys2.org/mingw/sources/mingw-w64-gst-plugins-base-1.28.9-1.src.tar.zst",
+  "source_sha256": "ec8f2f718adea7b097332a50a4e7b7081933c8929552b347d4c5468342b6257e",
+  "files": [
+    {
+      "file": "COPYING",
+      "sha256": "ad2eec519ebd4b5df86ea84dff24ae3bfa2edea846a703b58902dd221ae375db",
+      "source_member": "mingw-w64-gst-plugins-base/gst-plugins-base-1.28.9.tar.xz!/gst-plugins-base-1.28.9/COPYING"
+    }
+  ]
+}
