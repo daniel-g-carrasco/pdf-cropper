@@ -1,0 +1,13 @@
+{
+  "package": "mingw-w64-ucrt-x86_64-gstreamer",
+  "version": "1.28.9-1",
+  "source_url": "https://repo.msys2.org/mingw/sources/mingw-w64-gstreamer-1.28.9-1.src.tar.zst",
+  "source_sha256": "d406876e95a88c85a6a8e20bd25bd987a28721a0d0979cc0e58c268c3e9e775a",
+  "files": [
+    {
+      "file": "COPYING",
+      "sha256": "ad2eec519ebd4b5df86ea84dff24ae3bfa2edea846a703b58902dd221ae375db",
+      "source_member": "mingw-w64-gstreamer/gstreamer-1.28.9.tar.xz!/gstreamer-1.28.9/COPYING"
+    }
+  ]
+}

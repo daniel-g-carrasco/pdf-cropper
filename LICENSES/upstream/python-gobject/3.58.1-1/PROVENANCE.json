@@ -1,0 +1,18 @@
+{
+  "package": "mingw-w64-ucrt-x86_64-python-gobject",
+  "version": "3.58.1-1",
+  "source_url": "https://repo.msys2.org/mingw/sources/mingw-w64-pygobject-3.58.1-1.src.tar.zst",
+  "source_sha256": "ffb59f7aea375c3c8c8a0c9b2fde107271a675da468d554257120c70efb36ed3",
+  "files": [
+    {
+      "file": "COPYING",
+      "sha256": "f4cac31434b287b10a70b81c62cfa973d250417f8f248c4c1b5566d061ecfb2f",
+      "source_member": "mingw-w64-pygobject/pygobject-3.58.1.tar.gz!/pygobject-3.58.1/COPYING"
+    },
+    {
+      "file": "subprojects/pythoncapi-compat/COPYING",
+      "sha256": "3f2c1ffa76383a55ae0aac01c9737cd70050dff63e1f026694fbe9d662573c98",
+      "source_member": "mingw-w64-pygobject/pygobject-3.58.1.tar.gz!/pygobject-3.58.1/subprojects/pythoncapi-compat/COPYING"
+    }
+  ]
+}
