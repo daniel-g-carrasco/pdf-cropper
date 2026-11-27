@@ -3,6 +3,19 @@
 The changes that matter to whoever uses PDF Cropper. The versions up to
 1.1.6 are described in their GitHub releases.
 
+## [1.1.9] - 2026-11-27
+
+### Fixed
+- A cropped copy is written in a temporary folder next to the destination and then put in place: a file with the
+  same name plus `.part`, left there by another program, is no longer overwritten or deleted.
+
+### Licence
+- The Windows installer and portable zip carry the original licence texts of the bundled GStreamer, PyGObject,
+  GObject Introspection and CA certificates libraries, taken from their signed MSYS2 sources, and every file in them
+  has a recorded origin.
+- Each release comes with an inventory of its components and their versions (`.inventory.json`, signed like the
+  other files), checked before signing and again every week for published advisories.
+
 ## [1.1.8] - 2026-11-17
 
 ### Changed

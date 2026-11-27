@@ -25,7 +25,7 @@ import sys
 import time
 from pathlib import Path
 
-__version__ = "1.1.8"
+__version__ = "1.1.9"
 
 WINDOWS = sys.platform == "win32"
 
