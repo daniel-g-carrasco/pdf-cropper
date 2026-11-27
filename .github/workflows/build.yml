@@ -289,14 +289,20 @@ jobs:
       options: --privileged
     steps:
       - uses: actions/checkout@v7
-      # action maintained in flatpak/…; the runtime images come from flathub-infra/actions-images
-      - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
-        with:
-          bundle: pdf-cropper-${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'dev' }}-linux-x64.flatpak
-          manifest-path: build-aux/flatpak/io.github.daniel_g_carrasco.pdf-cropper.yaml
-          cache-key: flatpak-builder-${{ github.sha }}
-          build-dir: flatpak-output
-          upload-artifact: false
+      # Built directly on the SDK that the flathub-infra image already holds,
+      # as P7M Extractor does: the action's --install-deps-from=flathub first
+      # updates that SDK, and on some runners the update fails inside the
+      # container ("Invalid cross-device link") before anything is built.
+      - name: Build and export
+        run: |
+          set -eu
+          manifest=build-aux/flatpak/io.github.daniel_g_carrasco.pdf-cropper.yaml
+          version=dev
+          case "$GITHUB_REF" in refs/tags/v*) version="$GITHUB_REF_NAME" ;; esac
+          flatpak-builder --disable-rofiles-fuse --force-clean --arch=x86_64 --repo=repo flatpak-output "$manifest"
+          flatpak build-bundle repo "pdf-cropper-${version}-linux-x64.flatpak" \
+            io.github.daniel_g_carrasco.pdf-cropper stable \
+            --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo
       - name: Record Flatpak components
         run: |
           python3 tools/release_inventory.py create --revision "$GITHUB_SHA" \
